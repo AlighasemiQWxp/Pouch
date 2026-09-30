@@ -1,0 +1,40 @@
+# Local Android Studio and Gradle state
+/.gradle/
+/.idea/
+**/.gradle/
+**/.idea/
+**/.vscode/
+/local.properties
+/build.gradle
+/settings.gradle
+/gradle.properties
+/gradle/
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+
+# Flutter and Dart outputs
+flutter/.metadata
+**/.dart_tool/
+**/build/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/.packages
+
+# Rust build output
+**/target/
+
+# Environment files and editor state
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+*.iml
+
+# Local-only directories
+/app/
+/tests/

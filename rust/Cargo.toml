@@ -1,0 +1,21 @@
+[package]
+name = "pouch_core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+atomicwrites = "0.4.4"
+chrono = { version = "0.4", features = ["serde"] }
+crc32fast = "1"
+flutter_rust_bridge = "=2.13.0"
+jalali-calendar = { version = "0.1.2", features = ["chrono", "serde"] }
+postcard = { version = "1", features = ["alloc", "use-std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
