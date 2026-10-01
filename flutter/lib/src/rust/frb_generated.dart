@@ -1773,6 +1773,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_box_autoadd_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   BudgetPlanSnapshot dco_decode_budget_plan_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1896,8 +1902,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   GoalForecastSnapshot dco_decode_goal_forecast_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return GoalForecastSnapshot(
       id: dco_decode_String(arr[0]),
       periods: dco_decode_i_32(arr[1]),
@@ -1906,6 +1912,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       percent: dco_decode_i_32(arr[4]),
       difference: dco_decode_opt_CastedPrimitive_i_64(arr[5]),
       onTrack: dco_decode_bool(arr[6]),
+      completionDays: dco_decode_opt_box_autoadd_i_32(arr[7]),
+      dailyReduction: dco_decode_CastedPrimitive_i_64(arr[8]),
     );
   }
 
@@ -2050,6 +2058,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
   }
 
   @protected
@@ -2285,6 +2299,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_box_autoadd_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_32(deserializer));
+  }
+
+  @protected
   BudgetPlanSnapshot sse_decode_budget_plan_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -2434,6 +2454,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_percent = sse_decode_i_32(deserializer);
     var var_difference = sse_decode_opt_CastedPrimitive_i_64(deserializer);
     var var_onTrack = sse_decode_bool(deserializer);
+    var var_completionDays = sse_decode_opt_box_autoadd_i_32(deserializer);
+    var var_dailyReduction = sse_decode_CastedPrimitive_i_64(deserializer);
     return GoalForecastSnapshot(
       id: var_id,
       periods: var_periods,
@@ -2442,6 +2464,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       percent: var_percent,
       difference: var_difference,
       onTrack: var_onTrack,
+      completionDays: var_completionDays,
+      dailyReduction: var_dailyReduction,
     );
   }
 
@@ -2668,6 +2692,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_32(deserializer));
     } else {
       return null;
     }
@@ -2920,6 +2955,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self, serializer);
+  }
+
+  @protected
   void sse_encode_budget_plan_snapshot(
     BudgetPlanSnapshot self,
     SseSerializer serializer,
@@ -3033,6 +3074,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.percent, serializer);
     sse_encode_opt_CastedPrimitive_i_64(self.difference, serializer);
     sse_encode_bool(self.onTrack, serializer);
+    sse_encode_opt_box_autoadd_i_32(self.completionDays, serializer);
+    sse_encode_CastedPrimitive_i_64(self.dailyReduction, serializer);
   }
 
   @protected
@@ -3241,6 +3284,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_32(self, serializer);
     }
   }
 

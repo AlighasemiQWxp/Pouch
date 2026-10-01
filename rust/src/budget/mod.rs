@@ -84,8 +84,7 @@ pub fn period_at(state: &AppState, date: Date) -> PouchResult<Period> {
         .saturating_sub(1);
     let income_index = state.income.partition_point(|entry| entry.date <= date);
     if income_index == 0 {
-        let plan = &state.plans[plan_index];
-        let (start, end) = cycle(date, plan.payday, state.preferences.calendar)?;
+        let (start, end) = cycle(date, 1, state.preferences.calendar)?;
         return Ok(Period {
             start,
             end,
@@ -173,49 +172,35 @@ fn payday_in_month(date: Date, payday: u8, calendar_type: Calendar) -> PouchResu
 pub fn base(state: &AppState, date: Date) -> PouchResult<i64> {
     let period = period_at(state, date)?;
     let plan = &state.plans[period.plan_index];
-    let salary = period_salary(state, &period, plan);
-    if salary.is_none() && plan.daily_budget.hundredths() == 0 {
-        return Ok(0);
-    }
-    allowance_portion(plan, salary, period, date, date.add_days(1)?)
+    let salary = period_salary(state, &period);
+    allowance_portion(state, plan, salary, period, date, date.add_days(1)?)
 }
 
-fn period_salary(state: &AppState, period: &Period, plan: &BudgetPlan) -> Option<Money> {
+fn period_salary(state: &AppState, period: &Period) -> Money {
     match period.income_index {
-        Some(index) if period.funded => Some(state.income[index].amount),
-        Some(_) => Some(Money::default()),
-        None => plan.fallback_salary,
+        Some(index) if period.funded => state.income[index].amount,
+        _ => Money::default(),
     }
 }
 
-fn period_net(plan: &BudgetPlan, salary: Option<Money>, length: i32) -> PouchResult<i64> {
-    let required = plan
-        .expenses
-        .iter()
-        .try_fold(plan.monthly_savings.hundredths(), |sum, expense| {
-            checked_total(sum, expense.amount.hundredths())
-        })?;
-    let available = match salary {
-        Some(salary) => salary.hundredths().saturating_sub(required),
-        None => {
-            let raw = plan
-                .daily_budget
-                .hundredths()
-                .checked_mul(i64::from(length))
-                .ok_or(PouchError::TotalTooLarge)?;
-            if plan.legacy {
-                raw
-            } else {
-                raw.saturating_sub(required)
-            }
-        }
-    };
-    Ok(available.max(0))
+fn period_net(
+    state: &AppState,
+    plan: &BudgetPlan,
+    salary: Money,
+    period: Period,
+) -> PouchResult<i64> {
+    let required = plan.expenses.iter().try_fold(0_i64, |sum, expense| {
+        checked_total(sum, expense.amount.hundredths())
+    })?;
+    let savings = crate::savings::reservation(state, period)?;
+    let income = salary.hundredths();
+    Ok((income - checked_total(required, savings)?).max(0))
 }
 
 fn allowance_portion(
+    state: &AppState,
     plan: &BudgetPlan,
-    salary: Option<Money>,
+    salary: Money,
     period: Period,
     start: Date,
     stop: Date,
@@ -225,11 +210,11 @@ fn allowance_portion(
     if length <= 0 || count < 0 {
         return Err(PouchError::InvalidDate);
     }
-    let net = period_net(plan, salary, length)?;
+    let net = period_net(state, plan, salary, period)?;
     let mut total = (net / i64::from(length))
         .checked_mul(i64::from(count))
         .ok_or(PouchError::TotalTooLarge)?;
-    if !plan.legacy || salary.is_some() || plan.monthly_savings.hundredths() > 0 {
+    {
         let remainder = net % i64::from(length);
         let through_stop = i64::from(stop.days_until(period.start).saturating_neg()).min(remainder);
         let through_start =
@@ -255,10 +240,10 @@ pub fn base_between(state: &AppState, start: Date, end: Date) -> PouchResult<i64
         if stop <= cursor {
             return Err(PouchError::InvalidState);
         }
-        let salary = period_salary(state, &period, plan);
+        let salary = period_salary(state, &period);
         total = checked_total(
             total,
-            allowance_portion(plan, salary, period, cursor, stop)?,
+            allowance_portion(state, plan, salary, period, cursor, stop)?,
         )?;
         cursor = stop;
     }
@@ -266,24 +251,11 @@ pub fn base_between(state: &AppState, start: Date, end: Date) -> PouchResult<i64
 }
 
 pub fn allowance(state: &AppState, date: Date) -> PouchResult<i64> {
-    match state.days.get(&date).and_then(|day| day.budget_override) {
-        Some(value) => Ok(value.hundredths()),
-        None => base(state, date),
-    }
+    base(state, date)
 }
 
 pub fn allowance_between(state: &AppState, start: Date, end: Date) -> PouchResult<i64> {
-    let mut total = base_between(state, start, end)?;
-    for (date, day) in &state.days {
-        if *date >= start
-            && *date < end
-            && let Some(override_amount) = day.budget_override
-        {
-            let base_amount = base(state, *date)?;
-            total = checked_total(total, override_amount.hundredths() - base_amount)?;
-        }
-    }
-    Ok(total)
+    base_between(state, start, end)
 }
 
 pub fn spent(state: &AppState, start: Date, end: Date) -> PouchResult<i64> {
@@ -326,14 +298,8 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
                 0
             }
         })
-        .or_else(|| plan.fallback_salary.map(Money::hundredths))
-        .unwrap_or_else(|| {
-            if plan.daily_budget.hundredths() == 0 {
-                0
-            } else {
-                plan.daily_budget.hundredths() * i64::from(period.start.days_until(period.end))
-            }
-        });
+        .unwrap_or(0);
+    let savings = crate::savings::reservation(state, period)?;
     let required = plan.expenses.iter().try_fold(0_i64, |sum, expense| {
         checked_total(sum, expense.amount.hundredths())
     })?;
@@ -358,7 +324,7 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
     )?;
     let free = checked_total(funds, -reserved)?;
     let commitments = if income > 0 {
-        (checked_total(required, plan.monthly_savings.hundredths())? - income).max(0)
+        (checked_total(required, savings)? - income).max(0)
     } else {
         0
     };
@@ -410,9 +376,6 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
         limit = limit.min(div_floor(available_now, i64::from(count)) - discretionary_spent);
         shortfall = shortfall.max(required_now - free);
     }
-    if let Some(override_amount) = day.and_then(|day| day.budget_override) {
-        limit = limit.min((override_amount.hundredths() - discretionary_spent).max(0));
-    }
     if commitments > 0 {
         limit = 0;
     }
@@ -426,7 +389,7 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
         remaining,
         income,
         required_expenses: required,
-        savings: plan.monthly_savings.hundredths(),
+        savings,
         funds,
         reserved,
         recommendation: limit.max(0),
@@ -540,7 +503,11 @@ mod tests {
         let next_day = Date::parse_iso("2024-01-02").expect("the date is valid");
         let mut state = AppState::fresh(start);
         state.preferences.calendar = Calendar::Gregorian;
-        state.plans[0].daily_budget = Money::from_hundredths(100).expect("amount is valid");
+        state.income.push(IncomeEntry {
+            id: "salary".into(),
+            date: state.start_date,
+            amount: Money::from_hundredths(3100).expect("amount is valid"),
+        });
         state.days.insert(
             start,
             DailyRecord {
@@ -567,7 +534,11 @@ mod tests {
         let date = Date::parse_iso("2024-01-01").expect("the date is valid");
         let mut state = AppState::fresh(date);
         state.preferences.calendar = Calendar::Gregorian;
-        state.plans[0].daily_budget = Money::from_hundredths(100).expect("amount is valid");
+        state.income.push(IncomeEntry {
+            id: "salary".into(),
+            date: state.start_date,
+            amount: Money::from_hundredths(3100).expect("amount is valid"),
+        });
         state.planned.push(PlannedItem {
             id: "rent".into(),
             description: "Rent".into(),
@@ -595,5 +566,53 @@ mod tests {
         let paid = recommend(&state, date).expect("the paid budget can be calculated");
         assert_eq!(paid.reserved, 0);
         assert_eq!(paid.spent, 900);
+    }
+
+    #[test]
+    fn legacy_allowances_and_overrides_do_not_invent_received_income() {
+        let date = Date::parse_iso("2024-01-01").expect("valid date");
+        let mut state = AppState::fresh(date);
+        state.preferences.calendar = Calendar::Gregorian;
+        state.plans[0].fallback_salary =
+            Some(Money::from_hundredths(31_000).expect("valid amount"));
+        state.plans[0].daily_budget = Money::from_hundredths(100).expect("valid amount");
+        state.days.insert(
+            date,
+            DailyRecord {
+                budget_override: Some(Money::from_hundredths(500).expect("valid amount")),
+                purchases: Vec::new(),
+            },
+        );
+        let summary = recommend(&state, date).expect("valid summary");
+        assert_eq!(summary.income, 0);
+        assert_eq!(summary.recommendation, 0);
+    }
+
+    #[test]
+    fn a_goal_automatically_reduces_daily_spending_without_double_counting_savings() {
+        let date = Date::parse_iso("2024-01-01").expect("valid date");
+        let mut state = AppState::fresh(date);
+        state.preferences.calendar = Calendar::Gregorian;
+        state.income.push(IncomeEntry {
+            id: "salary".into(),
+            date,
+            amount: Money::from_hundredths(31_000).expect("valid amount"),
+        });
+        state.plans[0].monthly_savings = Money::from_hundredths(3100).expect("valid amount");
+        state.planned.push(PlannedItem {
+            id: "car".into(),
+            description: "Car".into(),
+            amount: Money::from_hundredths(6200).expect("valid amount"),
+            category: Category::Other,
+            kind: PlannedKind::Goal,
+            date: Date::parse_iso("2024-01-31").expect("valid date"),
+            status: PlannedStatus::Pending,
+            paid_date: None,
+            purchase_id: None,
+        });
+        let summary = recommend(&state, date).expect("valid summary");
+        assert_eq!(summary.savings, 6200);
+        assert_eq!(summary.reserved, 0);
+        assert_eq!(summary.recommendation, 800);
     }
 }

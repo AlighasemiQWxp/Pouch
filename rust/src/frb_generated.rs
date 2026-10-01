@@ -2114,6 +2114,8 @@ impl SseDecode for crate::api::GoalForecastSnapshot {
         let mut var_percent = <i32>::sse_decode(deserializer);
         let mut var_difference = <Option<i64>>::sse_decode(deserializer);
         let mut var_onTrack = <bool>::sse_decode(deserializer);
+        let mut var_completionDays = <Option<i32>>::sse_decode(deserializer);
+        let mut var_dailyReduction = <i64>::sse_decode(deserializer);
         return crate::api::GoalForecastSnapshot {
             id: var_id,
             periods: var_periods,
@@ -2122,6 +2124,8 @@ impl SseDecode for crate::api::GoalForecastSnapshot {
             percent: var_percent,
             difference: var_difference,
             on_track: var_onTrack,
+            completion_days: var_completionDays,
+            daily_reduction: var_dailyReduction,
         };
     }
 }
@@ -2346,6 +2350,17 @@ impl SseDecode for Option<String> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<i32>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -2819,6 +2834,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::GoalForecastSnapshot {
             self.percent.into_into_dart().into_dart(),
             self.difference.into_into_dart().into_dart(),
             self.on_track.into_into_dart().into_dart(),
+            self.completion_days.into_into_dart().into_dart(),
+            self.daily_reduction.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3160,6 +3177,8 @@ impl SseEncode for crate::api::GoalForecastSnapshot {
         <i32>::sse_encode(self.percent, serializer);
         <Option<i64>>::sse_encode(self.difference, serializer);
         <bool>::sse_encode(self.on_track, serializer);
+        <Option<i32>>::sse_encode(self.completion_days, serializer);
+        <i64>::sse_encode(self.daily_reduction, serializer);
     }
 }
 
@@ -3342,6 +3361,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <i32>::sse_encode(value, serializer);
         }
     }
 }

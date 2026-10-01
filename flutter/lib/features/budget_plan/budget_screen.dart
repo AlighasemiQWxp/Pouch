@@ -40,8 +40,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
       ? _lastPersianCalendarDate
       : _lastIncomeDate;
 
-  late final TextEditingController _salary = TextEditingController();
-  late final TextEditingController _daily = TextEditingController();
   late final TextEditingController _savings = TextEditingController();
   late final TextEditingController _incomeAmount = TextEditingController();
   late final List<_ExpenseDraft> _expenses = [];
@@ -67,25 +65,16 @@ class _BudgetScreenState extends State<BudgetScreen> {
   String? _editingIncomeId;
   String? _editingExpectedIncomeId;
   String? _editingPlanEffective;
-  int _payday = 1;
   bool _advancedDate = false;
 
   @override
   void initState() {
     super.initState();
     final plan = widget.snapshot.planAt(widget.today);
-    _salary.text = plan.salary == null
-        ? ''
-        : amountInput(plan.salary!, language: widget.strings.language);
-    _daily.text = amountInput(
-      plan.dailyBudget,
-      language: widget.strings.language,
-    );
     _savings.text = amountInput(
       plan.savings,
       language: widget.strings.language,
     );
-    _payday = plan.payday;
     for (final expense in plan.expenses) {
       _expenses.add(
         _ExpenseDraft(
@@ -126,8 +115,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   @override
   void dispose() {
-    _salary.dispose();
-    _daily.dispose();
     _savings.dispose();
     _incomeAmount.dispose();
     for (final expense in _expenses) {
@@ -157,10 +144,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (isEditingIncome) {
       incomeActionLabel = strings.text('saveChanges');
       incomeActionIcon = Icons.save_outlined;
-    }
-    var calendarLabel = strings.text('gregory');
-    if (widget.snapshot.preferences.calendar == 'persian') {
-      calendarLabel = strings.text('persian');
     }
     return PouchPage(
       children: [
@@ -393,7 +376,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     ),
                     subtitle: Text(
                       formatMoney(
-                        plan.dailyBudget,
+                        plan.savings,
                         widget.snapshot.preferences.currency,
                         strings,
                       ),
@@ -422,33 +405,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   ),
                 const SizedBox(height: 8),
               ],
-              TextField(
-                controller: _salary,
-                inputFormatters: [
-                  PouchMoneyInputFormatter(widget.strings.language),
-                ],
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: strings.text('salary'),
-                  helperText: strings.text('salaryCalendarHint'),
-                ),
-              ),
-              const SizedBox(height: 11),
-              TextField(
-                controller: _daily,
-                inputFormatters: [
-                  PouchMoneyInputFormatter(widget.strings.language),
-                ],
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: strings.text('defaultDaily'),
-                ),
-              ),
-              const SizedBox(height: 11),
               TextField(
                 controller: _savings,
                 inputFormatters: [
@@ -526,51 +482,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       ],
                     ),
                   ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 170,
-                    child: DropdownButtonFormField<int>(
-                      initialValue: _payday,
-                      decoration: InputDecoration(
-                        labelText: strings.text('payday'),
-                      ),
-                      items: List.generate(31, (index) => index + 1)
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text('$value'),
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: (value) =>
-                          setState(() => _payday = value ?? 1),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 210,
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        labelText: strings.text('calendarPreference'),
-                      ),
-                      child: Text(calendarLabel),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                strings.text('calendarPreferenceHint'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 12,
-                  height: 1.5,
-                ),
-              ),
               const SizedBox(height: 14),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
@@ -915,11 +826,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final accepted = await widget.run(
       () => widget.bridge.saveBudgetPlan(
         effective: effective,
-        salary: _salary.text.trim().isEmpty ? null : _salary.text.trim(),
-        dailyBudget: _daily.text.trim(),
+        salary: null,
+        dailyBudget: '0',
         expenses: expenses,
         savings: _savings.text.trim().isEmpty ? '0' : _savings.text.trim(),
-        payday: _payday,
+        payday: 1,
       ),
     );
     if (accepted && mounted) {
@@ -936,18 +847,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   void _loadPlan(PouchBudgetPlan plan) {
-    _salary.text = plan.salary == null
-        ? ''
-        : amountInput(plan.salary!, language: widget.strings.language);
-    _daily.text = amountInput(
-      plan.dailyBudget,
-      language: widget.strings.language,
-    );
     _savings.text = amountInput(
       plan.savings,
       language: widget.strings.language,
     );
-    _payday = plan.payday;
     for (final expense in _expenses) {
       expense.dispose();
     }
@@ -990,7 +893,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             const SizedBox(width: 8),
             Text(
               formatMoney(
-                plan.dailyBudget,
+                plan.savings,
                 widget.snapshot.preferences.currency,
                 widget.strings,
               ),

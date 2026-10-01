@@ -325,6 +325,8 @@ class PouchGoalForecast {
     required this.percent,
     required this.difference,
     required this.onTrack,
+    required this.completionDays,
+    required this.dailyReduction,
   });
 
   final String id;
@@ -334,6 +336,8 @@ class PouchGoalForecast {
   final int percent;
   final int? difference;
   final bool onTrack;
+  final int? completionDays;
+  final int dailyReduction;
 
   factory PouchGoalForecast.fromBridge(dynamic value) => PouchGoalForecast(
     id: value.id as String,
@@ -343,6 +347,8 @@ class PouchGoalForecast {
     percent: value.percent as int,
     difference: value.difference as int?,
     onTrack: value.onTrack as bool,
+    completionDays: value.completionDays as int?,
+    dailyReduction: value.dailyReduction as int,
   );
 }
 

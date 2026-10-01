@@ -40,9 +40,6 @@ class _TodayScreenState extends State<TodayScreen> {
   late Future<PouchBudgetSummary> _summary = widget.bridge.budgetSummary(
     widget.selectedDate,
   );
-  final TextEditingController _overrideController = TextEditingController();
-  final TextEditingController _purchaseSearch = TextEditingController();
-  String _purchaseCategory = 'all';
 
   @override
   void didUpdateWidget(covariant TodayScreen oldWidget) {
@@ -50,25 +47,12 @@ class _TodayScreenState extends State<TodayScreen> {
     if (oldWidget.selectedDate != widget.selectedDate ||
         oldWidget.snapshot.revision != widget.snapshot.revision) {
       _summary = widget.bridge.budgetSummary(widget.selectedDate);
-      _overrideController.text = _currentOverride == null
-          ? ''
-          : amountInput(_currentOverride!, language: widget.strings.language);
     }
-  }
-
-  int? get _currentOverride => widget.snapshot.day(widget.selectedDate)?.budget;
-
-  @override
-  void dispose() {
-    _overrideController.dispose();
-    _purchaseSearch.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = widget.strings;
-    final day = widget.snapshot.day(widget.selectedDate);
     final plannedForDay = widget.snapshot.planned
         .where(
           (item) => item.date == widget.selectedDate && item.kind == 'expense',
@@ -78,6 +62,14 @@ class _TodayScreenState extends State<TodayScreen> {
     return PouchPage(
       children: [
         _buildDateBar(context),
+        Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: TextButton.icon(
+            onPressed: _showHistory,
+            icon: const Icon(Icons.history_rounded),
+            label: Text(strings.text('purchaseHistory')),
+          ),
+        ),
         const SizedBox(height: 14),
         FutureBuilder<PouchBudgetSummary>(
           future: _summary,
@@ -97,9 +89,6 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         const SizedBox(height: 14),
         if (widget.selectedDate == widget.today) _buildTomorrowForecast(),
-        if (widget.selectedDate.compareTo(widget.today) >= 0)
-          _buildOverrideCard(),
-        _buildPurchasesCard(day?.purchases ?? const [], isFuture),
         if (plannedForDay.isNotEmpty) _buildPlannedExpenses(plannedForDay),
         _PurchaseForm(
           bridge: widget.bridge,
@@ -482,166 +471,44 @@ class _TodayScreenState extends State<TodayScreen> {
     ),
   );
 
-  Widget _buildOverrideCard() => Padding(
-    padding: const EdgeInsets.only(bottom: 14),
-    child: PouchCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PouchSectionHeading(title: widget.strings.text('override')),
-          const SizedBox(height: 6),
-          Text(
-            widget.strings.text('overrideHint'),
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 12,
-              height: 1.55,
+  Future<void> _showHistory() async {
+    final purchases =
+        widget.snapshot.day(widget.selectedDate)?.purchases ?? const [];
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(widget.strings.text('purchaseHistory')),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (purchases.isEmpty) Text(widget.strings.text('noPurchases')),
+                for (final purchase in purchases)
+                  _PurchaseTile(
+                    purchase: purchase,
+                    currency: widget.snapshot.preferences.currency,
+                    strings: widget.strings,
+                    onEdit: () {
+                      Navigator.pop(dialogContext);
+                      _editPurchase(purchase);
+                    },
+                    onDelete: () {
+                      Navigator.pop(dialogContext);
+                      _deletePurchase(purchase);
+                    },
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _overrideController,
-            inputFormatters: [
-              PouchMoneyInputFormatter(widget.strings.language),
-            ],
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: widget.strings.text('defaultAmount'),
-              prefixText: '${widget.strings.text('base')}: ',
-            ),
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: PouchPrimaryButton(
-              label: widget.strings.text('saveOverride'),
-              icon: Icons.save_rounded,
-              onPressed: widget.working
-                  ? null
-                  : () => widget.run(
-                      () => widget.bridge.setDailyOverride(
-                        widget.selectedDate,
-                        _overrideController.text.trim().isEmpty
-                            ? null
-                            : _overrideController.text.trim(),
-                      ),
-                    ),
-            ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(widget.strings.text('close')),
           ),
         ],
-      ),
-    ),
-  );
-
-  Widget _buildPurchasesCard(List<PouchPurchase> purchases, bool isFuture) {
-    final query = _purchaseSearch.text.trim().toLowerCase();
-    final visible = purchases
-        .where((purchase) {
-          final matchesText = purchase.description.toLowerCase().contains(
-            query,
-          );
-          final matchesCategory =
-              _purchaseCategory == 'all' ||
-              purchase.category == _purchaseCategory;
-          return matchesText && matchesCategory;
-        })
-        .toList(growable: false);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: PouchCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PouchSectionHeading(
-              title: widget.strings.text('purchases'),
-              trailing: Text(
-                '${purchases.length}',
-                style: TextStyle(color: context.pouchPalette.muted),
-              ),
-            ),
-            const SizedBox(height: 10),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final search = TextField(
-                  controller: _purchaseSearch,
-                  maxLength: 120,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: widget.strings.text('search'),
-                    counterText: '',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                  ),
-                );
-                final category = DropdownButtonFormField<String>(
-                  initialValue: _purchaseCategory,
-                  decoration: InputDecoration(
-                    labelText: widget.strings.text('category'),
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'all',
-                      child: Text(widget.strings.text('allCategories')),
-                    ),
-                    ..._categories().map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(widget.strings.text(value)),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _purchaseCategory = value ?? 'all'),
-                );
-                if (constraints.maxWidth < 560) {
-                  return Column(
-                    children: [search, const SizedBox(height: 8), category],
-                  );
-                }
-                return Row(
-                  children: [
-                    Expanded(child: search),
-                    const SizedBox(width: 12),
-                    Expanded(child: category),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            if (isFuture && purchases.isEmpty)
-              Text(
-                widget.strings.text('plannedFuture'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  height: 1.55,
-                ),
-              )
-            else if (purchases.isEmpty)
-              Text(
-                widget.strings.text('noPurchases'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  height: 1.55,
-                ),
-              )
-            else if (visible.isEmpty)
-              Text(
-                widget.strings.text('noMatches'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  height: 1.55,
-                ),
-              )
-            else
-              for (final purchase in visible)
-                _PurchaseTile(
-                  purchase: purchase,
-                  currency: widget.snapshot.preferences.currency,
-                  strings: widget.strings,
-                  onEdit: () => _editPurchase(purchase),
-                  onDelete: () => _deletePurchase(purchase),
-                ),
-          ],
-        ),
       ),
     );
   }

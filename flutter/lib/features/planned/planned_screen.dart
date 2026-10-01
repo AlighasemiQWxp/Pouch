@@ -130,6 +130,11 @@ class _PlannedScreenState extends State<PlannedScreen> {
         FutureBuilder<List<PouchGoalForecast>>(
           future: widget.bridge.goalForecast(widget.today),
           builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return PouchCard(
+                child: PouchInlineError(strings.text('invalidAmount')),
+              );
+            }
             final goals = snapshot.data ?? const [];
             if (goals.isEmpty) return const SizedBox.shrink();
             return PouchCard(
@@ -155,10 +160,6 @@ class _PlannedScreenState extends State<PlannedScreen> {
                       ),
                       strings: strings,
                       currency: widget.snapshot.preferences.currency,
-                      today: widget.today,
-                      monthlySavings: widget.snapshot
-                          .planAt(widget.today)
-                          .savings,
                     ),
                 ],
               ),
@@ -259,10 +260,7 @@ class _PlannedTile extends StatelessWidget {
     final titleAndDate = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          item.description,
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        Text(item.description, style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 3),
         Wrap(
           spacing: 4,
@@ -333,7 +331,11 @@ class _PlannedTile extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final iconWidget = Icon(icon, color: context.pouchPalette.goldDeep, size: 20);
+          final iconWidget = Icon(
+            icon,
+            color: context.pouchPalette.goldDeep,
+            size: 20,
+          );
           if (constraints.maxWidth < 560) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -398,101 +400,37 @@ class _GoalForecastTile extends StatelessWidget {
     required this.item,
     required this.strings,
     required this.currency,
-    required this.today,
-    required this.monthlySavings,
   });
 
   final PouchGoalForecast goal;
   final PouchPlannedItem item;
   final AppStrings strings;
   final String currency;
-  final String today;
-  final int monthlySavings;
 
   @override
   Widget build(BuildContext context) {
-    final required = goal.requiredMonthly;
-    final daysUntil = DateTime.parse('${item.date}T00:00:00Z')
-        .difference(DateTime.parse('${today}T00:00:00Z'))
-        .inDays;
-    var timeRemaining = strings.text('overdueByDays', {
-      'days': localizeDigits('${daysUntil.abs()}', strings.language),
-    });
-    if (daysUntil >= 0) {
-      timeRemaining = strings.text('dueInDays', {
-        'days': localizeDigits('$daysUntil', strings.language),
+    var estimate = strings.text('goalNoFunding');
+    if (goal.completionDays == 0) {
+      estimate = strings.text('goalFunded');
+    } else if (goal.completionDays != null) {
+      estimate = strings.text('goalCompletionDays', {
+        'days': localizeDigits('${goal.completionDays}', strings.language),
       });
     }
-    final text = required == null
-        ? strings.text('goalNoTime')
-        : goal.onTrack
-        ? strings.text('goalEnough')
-        : strings.text('goalDifference', {
-            'amount': formatMoney(goal.difference ?? 0, currency, strings),
-          });
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            strings.text('goalTarget', {
-              'amount': formatMoney(item.amount, currency, strings),
-            }),
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 11,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            strings.text('goalTimeRemaining', {'time': timeRemaining}),
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 11,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            strings.text('goalCurrentMonthly', {
-              'amount': formatMoney(monthlySavings, currency, strings),
-            }),
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 11,
-              height: 1.5,
-            ),
-          ),
-          if (required != null) ...[
-            const SizedBox(height: 3),
-            Text(
-              strings.text('goalRequiredMonthly', {
-                'amount': formatMoney(required, currency, strings),
-              }),
-              style: TextStyle(
-                color: context.pouchPalette.muted,
-                fontSize: 11,
-                height: 1.5,
-              ),
-            ),
-          ],
           Row(
             children: [
               Expanded(
                 child: Text(
                   item.description,
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              Text(
-                '${goal.percent}%',
-                style: TextStyle(
-                  color: context.pouchPalette.goldDeep,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Text('${localizeDigits('${goal.percent}', strings.language)}%'),
             ],
           ),
           const SizedBox(height: 7),
@@ -505,35 +443,30 @@ class _GoalForecastTile extends StatelessWidget {
               backgroundColor: context.pouchPalette.border,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 7),
           Text(
-            text,
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 11,
-              height: 1.5,
-            ),
-          ),
-          Text(
-            strings.text('goalProjection', {
-              'percent': localizeDigits('${goal.percent}', strings.language),
+            strings.text('goalAllocated', {
+              'saved': formatMoney(goal.projected, currency, strings),
+              'target': formatMoney(item.amount, currency, strings),
             }),
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 11,
-              height: 1.5,
-            ),
           ),
-          Text(
-            strings.text('goalRemaining', {
-              'amount': formatMoney(goal.projected, currency, strings),
-            }),
-            style: TextStyle(
-              color: context.pouchPalette.muted,
-              fontSize: 11,
-              height: 1.5,
+          const SizedBox(height: 4),
+          Text(estimate),
+          if (goal.dailyReduction > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              strings.text('goalDailyReduction', {
+                'amount': formatMoney(goal.dailyReduction, currency, strings),
+              }),
             ),
-          ),
+          ],
+          if (!goal.onTrack && goal.completionDays != 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              strings.text('goalBehind'),
+              style: TextStyle(color: context.pouchPalette.muted, fontSize: 12),
+            ),
+          ],
         ],
       ),
     );
@@ -756,9 +689,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
       children: [
         TextField(
           controller: _amount,
-          inputFormatters: [
-            PouchMoneyInputFormatter(widget.strings.language),
-          ],
+          inputFormatters: [PouchMoneyInputFormatter(widget.strings.language)],
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: widget.strings.text('actualAmount'),

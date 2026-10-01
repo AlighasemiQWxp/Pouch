@@ -13,15 +13,19 @@ The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp)
 - English and Persian interfaces, with right-to-left Persian layouts and Gregorian or Jalali calendars
 - Country-based currency, calendar, and week-start defaults, with manual calendar and week-start choices
 - Recorded income and future expected income, kept separate until it is marked received
-- Income calendar, monthly budget plans, recurring expenses, and savings commitments
+- Income calendar and a simple monthly plan for savings and essential expenses
 - Daily spending recommendations with carry-forward balances
 - Planned expenses that reserve money until paid
-- Savings goal forecasts based on the monthly savings commitment
-- Searchable purchase history with categories and undo for recent deletions
+- Automatic savings allocations shared across goals, with funded progress, daily spending adjustments, and completion estimates
+- Purchase history available on demand, with editing and undo for recent deletions
 - Reports for selected days, date ranges, weeks, and months, with PDF printing on Android
 - Local JSON backup and restore, with recovery copies for saved data
 
 Pouch keeps budgeting data on the device. Its recommendations are calculations from recorded income and expenses, not a bank balance or a promise of future income.
+
+Budget Plan uses the calendar chosen in Settings. Received income funds daily recommendations; manual salary, base allowance, payday, and daily overrides are no longer used. Existing backup fields remain readable for compatibility. Monthly savings is a minimum: goals can increase the shared allocation, while essential expenses and recorded spending reduce available funds. Goal progress describes funds allocated by the model, not money transferred to a separate account. Goal completion estimates assume similar future received income and spending; expected income never funds current progress. Target dates determine goal priority. Changing a goal recalculates allocations from the recorded history.
+
+Today shows the spending recommendation, expense entry, and relevant planned expenses. Purchase history opens only when requested, without search or category filters.
 
 ## Project structure
 

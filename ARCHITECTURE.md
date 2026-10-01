@@ -49,6 +49,12 @@ Preferences own the selected country, language, currency, calendar, and week sta
 
 Expected income is stored separately from recorded income. It appears in the income calendar and can be edited, removed, or marked received. Budget, savings, and reports use recorded income only, so forecasts do not fund spending before the user confirms receipt.
 
+Budget plans expose monthly savings and essential expenses. The stored fallback salary, base daily budget, payday, and daily override fields remain in backups for compatibility, but no longer fund or limit recommendations. Received income anchors funded periods; unfunded dates use the selected calendar without inventing income.
+
+The savings module owns the shared allocation. It reserves the greater of the configured minimum and the amount needed by cumulative goals in target date order. Goal amounts are never also counted as ordinary planned expenses. Funded progress is capped by received income after essential expenses, purchases, and pending expenses; goal purchases consume the shared allocation. Allocations are calculated from history rather than stored as a separate savings ledger, so changes to goals can recalculate past allocations. The goals module owns completion estimates and marginal daily spending reductions. Completion assumes similar future income and discretionary spending, and is unavailable when funding cannot support savings.
+
+Flutter presents a concise progress bar, allocated amount, completion estimate, and spending adjustment. Today keeps purchase entry and opens editing history in a dialog on demand. The goal forecast bridge includes completion_days and daily_reduction; regenerate its typed adapters after API changes before validation.
+
 ## Source map
 
 - flutter/lib/features contains the Preferences, Budget Plan, Today, Planned Expenses, Reports, and About screens.

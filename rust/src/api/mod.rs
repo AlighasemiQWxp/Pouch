@@ -399,6 +399,8 @@ impl PouchApp {
                     percent: goal.percent,
                     difference: goal.difference,
                     on_track: goal.on_track,
+                    completion_days: goal.completion_days,
+                    daily_reduction: goal.daily_reduction,
                 })
             })
             .collect()
@@ -544,6 +546,8 @@ pub struct GoalForecastSnapshot {
     pub percent: i32,
     pub difference: Option<i64>,
     pub on_track: bool,
+    pub completion_days: Option<i32>,
+    pub daily_reduction: i64,
 }
 
 pub struct ReportSnapshot {

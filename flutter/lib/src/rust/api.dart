@@ -488,6 +488,8 @@ class GoalForecastSnapshot {
   final int percent;
   final int? difference;
   final bool onTrack;
+  final int? completionDays;
+  final int dailyReduction;
 
   const GoalForecastSnapshot({
     required this.id,
@@ -497,6 +499,8 @@ class GoalForecastSnapshot {
     required this.percent,
     this.difference,
     required this.onTrack,
+    this.completionDays,
+    required this.dailyReduction,
   });
 
   @override
@@ -507,7 +511,9 @@ class GoalForecastSnapshot {
       projected.hashCode ^
       percent.hashCode ^
       difference.hashCode ^
-      onTrack.hashCode;
+      onTrack.hashCode ^
+      completionDays.hashCode ^
+      dailyReduction.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -520,7 +526,9 @@ class GoalForecastSnapshot {
           projected == other.projected &&
           percent == other.percent &&
           difference == other.difference &&
-          onTrack == other.onTrack;
+          onTrack == other.onTrack &&
+          completionDays == other.completionDays &&
+          dailyReduction == other.dailyReduction;
 }
 
 class IncomeSnapshot {
