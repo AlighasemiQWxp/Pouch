@@ -275,11 +275,12 @@ pub fn allowance(state: &AppState, date: Date) -> PouchResult<i64> {
 pub fn allowance_between(state: &AppState, start: Date, end: Date) -> PouchResult<i64> {
     let mut total = base_between(state, start, end)?;
     for (date, day) in &state.days {
-        if *date >= start && *date < end {
-            if let Some(override_amount) = day.budget_override {
-                let base_amount = base(state, *date)?;
-                total = checked_total(total, override_amount.hundredths() - base_amount)?;
-            }
+        if *date >= start
+            && *date < end
+            && let Some(override_amount) = day.budget_override
+        {
+            let base_amount = base(state, *date)?;
+            total = checked_total(total, override_amount.hundredths() - base_amount)?;
         }
     }
     Ok(total)
@@ -455,8 +456,8 @@ mod tests {
     use crate::{
         AppState, Date, Money,
         models::{
-            BudgetPlan, Calendar, Category, DailyRecord, IncomeEntry, PlannedItem, PlannedKind,
-            PlannedStatus, Purchase, RequiredExpense,
+            Calendar, Category, DailyRecord, IncomeEntry, PlannedItem, PlannedKind, PlannedStatus,
+            Purchase, RequiredExpense,
         },
     };
 
@@ -515,6 +516,7 @@ mod tests {
     fn monthly_expenses_and_savings_are_reserved_before_daily_allowance() {
         let start = Date::parse_iso("2024-01-01").expect("the date is valid");
         let mut state = AppState::fresh(start);
+        state.preferences.calendar = Calendar::Gregorian;
         state.plans[0].expenses.push(RequiredExpense {
             id: "rent".into(),
             name: "Rent".into(),
@@ -537,6 +539,7 @@ mod tests {
         let start = Date::parse_iso("2024-01-01").expect("the date is valid");
         let next_day = Date::parse_iso("2024-01-02").expect("the date is valid");
         let mut state = AppState::fresh(start);
+        state.preferences.calendar = Calendar::Gregorian;
         state.plans[0].daily_budget = Money::from_hundredths(100).expect("amount is valid");
         state.days.insert(
             start,
@@ -563,6 +566,7 @@ mod tests {
     fn pending_expenses_reserve_funds_until_the_actual_payment_is_recorded() {
         let date = Date::parse_iso("2024-01-01").expect("the date is valid");
         let mut state = AppState::fresh(date);
+        state.preferences.calendar = Calendar::Gregorian;
         state.plans[0].daily_budget = Money::from_hundredths(100).expect("amount is valid");
         state.planned.push(PlannedItem {
             id: "rent".into(),

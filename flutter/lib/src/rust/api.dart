@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_currency`, `parse_date`, `parse_language`, `parse_planned_kind`, `parse_week_start`, `planned_kind_name`, `planned_status_name`, `report_snapshot`, `snapshot`, `week_start_number`
+// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_language`, `parse_planned_kind`, `parse_week_start`, `planned_kind_name`, `planned_status_name`, `report_snapshot`, `snapshot`, `week_start_number`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>>
 abstract class PouchApp implements RustOpaqueInterface {
@@ -55,6 +55,11 @@ abstract class PouchApp implements RustOpaqueInterface {
 
   Future<AppSnapshot> importBackup({required String contents});
 
+  Future<AppSnapshot> markExpectedIncomeReceived({
+    required String id,
+    required String receivedDate,
+  });
+
   Future<AppSnapshot> markPlannedPaid({
     required String planId,
     required String purchaseId,
@@ -77,6 +82,8 @@ abstract class PouchApp implements RustOpaqueInterface {
   });
 
   Future<AppSnapshot> removeBudgetPlan({required String effective});
+
+  Future<AppSnapshot> removeExpectedIncome({required String id});
 
   Future<AppSnapshot> removeIncome({required String id});
 
@@ -126,6 +133,12 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String date,
   });
 
+  Future<AppSnapshot> scheduleIncome({
+    required String id,
+    required String date,
+    required String amount,
+  });
+
   Future<AppSnapshot> setDailyOverride({required String date, String? amount});
 
   Future<AppSnapshot> snapshot();
@@ -134,6 +147,12 @@ abstract class PouchApp implements RustOpaqueInterface {
 
   Future<AppSnapshot> undoLastChange();
 
+  Future<AppSnapshot> updateExpectedIncome({
+    required String id,
+    required String date,
+    required String amount,
+  });
+
   Future<AppSnapshot> updateIncome({
     required String id,
     required String date,
@@ -141,6 +160,7 @@ abstract class PouchApp implements RustOpaqueInterface {
   });
 
   Future<AppSnapshot> updatePreferences({
+    required String country,
     required String currency,
     required String language,
     required String calendar,
@@ -155,6 +175,7 @@ class AppSnapshot {
   final String startDate;
   final PreferencesSnapshot preferences;
   final List<IncomeSnapshot> income;
+  final List<ExpectedIncomeSnapshot> expectedIncome;
   final List<BudgetPlanSnapshot> plans;
   final List<DaySnapshot> days;
   final List<PlannedSnapshot> planned;
@@ -166,6 +187,7 @@ class AppSnapshot {
     required this.startDate,
     required this.preferences,
     required this.income,
+    required this.expectedIncome,
     required this.plans,
     required this.days,
     required this.planned,
@@ -179,6 +201,7 @@ class AppSnapshot {
       startDate.hashCode ^
       preferences.hashCode ^
       income.hashCode ^
+      expectedIncome.hashCode ^
       plans.hashCode ^
       days.hashCode ^
       planned.hashCode;
@@ -194,6 +217,7 @@ class AppSnapshot {
           startDate == other.startDate &&
           preferences == other.preferences &&
           income == other.income &&
+          expectedIncome == other.expectedIncome &&
           plans == other.plans &&
           days == other.days &&
           planned == other.planned;
@@ -432,6 +456,30 @@ class DaySnapshot {
           purchases == other.purchases;
 }
 
+class ExpectedIncomeSnapshot {
+  final String id;
+  final String date;
+  final int amount;
+
+  const ExpectedIncomeSnapshot({
+    required this.id,
+    required this.date,
+    required this.amount,
+  });
+
+  @override
+  int get hashCode => id.hashCode ^ date.hashCode ^ amount.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExpectedIncomeSnapshot &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          date == other.date &&
+          amount == other.amount;
+}
+
 class GoalForecastSnapshot {
   final String id;
   final int periods;
@@ -586,12 +634,14 @@ class PlannedSnapshot {
 }
 
 class PreferencesSnapshot {
+  final String country;
   final String currency;
   final String language;
   final String calendar;
   final int weekStart;
 
   const PreferencesSnapshot({
+    required this.country,
     required this.currency,
     required this.language,
     required this.calendar,
@@ -600,6 +650,7 @@ class PreferencesSnapshot {
 
   @override
   int get hashCode =>
+      country.hashCode ^
       currency.hashCode ^
       language.hashCode ^
       calendar.hashCode ^
@@ -610,6 +661,7 @@ class PreferencesSnapshot {
       identical(this, other) ||
       other is PreferencesSnapshot &&
           runtimeType == other.runtimeType &&
+          country == other.country &&
           currency == other.currency &&
           language == other.language &&
           calendar == other.calendar &&

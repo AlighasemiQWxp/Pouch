@@ -38,8 +38,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final List<String> _selectedDays = [];
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _previewKey = GlobalKey();
-  Future<PouchReport>? _reportFuture;
+  PouchReport? _report;
+  bool _previewFailed = false;
+  bool _reportLoading = false;
   bool _printing = false;
+  int _requestVersion = 0;
 
   @override
   void dispose() {
@@ -65,7 +68,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               PouchSectionHeading(title: strings.text('reportBuilder')),
               const SizedBox(height: 14),
               DropdownButtonFormField<_ReportMode>(
-                value: _mode,
+                initialValue: _mode,
                 decoration: InputDecoration(
                   labelText: strings.text('reportMode'),
                 ),
@@ -79,7 +82,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     .toList(growable: false),
                 onChanged: (value) => setState(() {
                   _mode = value ?? _ReportMode.range;
-                  _reportFuture = null;
+                  _report = null;
+                  _previewFailed = false;
+                  _reportLoading = false;
+                  _requestVersion++;
                 }),
               ),
               const SizedBox(height: 12),
@@ -92,31 +98,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 alignment: AlignmentDirectional.centerEnd,
                 child: PouchPrimaryButton(
                   label: strings.text('preview'),
-                  icon: Icons.visibility_outlined,
-                  onPressed: _loadReport,
+                  icon: _reportLoading
+                      ? Icons.hourglass_top_rounded
+                      : Icons.visibility_outlined,
+                  onPressed: _reportLoading ? null : _loadReport,
                 ),
               ),
             ],
           ),
         ),
-        if (_reportFuture != null) ...[
+        if (_reportLoading || _report != null || _previewFailed) ...[
           const SizedBox(height: 14),
           KeyedSubtree(
             key: _previewKey,
-            child: FutureBuilder<PouchReport>(
-              future: _reportFuture,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return PouchCard(
+            child: _reportLoading
+                ? const PouchCard(child: LinearProgressIndicator())
+                : _previewFailed
+                ? PouchCard(
                     child: PouchInlineError(strings.text('invalidReport')),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const PouchCard(child: LinearProgressIndicator());
-                }
-                return _buildPreview(snapshot.data!);
-              },
-            ),
+                  )
+                : _buildPreview(_report!),
           ),
         ],
       ],
@@ -150,7 +151,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
             await _pickDate((value) {
               if (!_selectedDays.contains(value)) _selectedDays.add(value);
             }, widget.today);
-            setState(() => _reportFuture = null);
+            if (!mounted) return;
+            setState(() {
+              _report = null;
+              _previewFailed = false;
+              _reportLoading = false;
+              _requestVersion++;
+            });
           },
           icon: const Icon(Icons.add_rounded),
           label: Text(widget.strings.text('addDay')),
@@ -182,7 +189,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
                 onDeleted: () => setState(() {
                   _selectedDays.remove(value);
-                  _reportFuture = null;
+                  _report = null;
+                  _previewFailed = false;
+                  _reportLoading = false;
+                  _requestVersion++;
                 }),
               ),
           ],
@@ -386,12 +396,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
   );
 
   Future<void> _loadReport() async {
-    final future = _createReport();
-    setState(() => _reportFuture = future);
+    if ((_mode == _ReportMode.range && _from.compareTo(_through) > 0) ||
+        (_mode == _ReportMode.specific && _selectedDays.isEmpty)) {
+      setState(() {
+        _report = null;
+        _previewFailed = true;
+        _reportLoading = false;
+        _requestVersion++;
+      });
+      _revealPreview();
+      return;
+    }
+    final requestVersion = ++_requestVersion;
+    setState(() {
+      _report = null;
+      _previewFailed = false;
+      _reportLoading = true;
+    });
     _revealPreview();
     try {
-      await future;
-    } catch (_) {}
+      final report = await _createReport();
+      if (!mounted || requestVersion != _requestVersion) return;
+      setState(() {
+        _report = report;
+        _reportLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || requestVersion != _requestVersion) return;
+      setState(() {
+        _previewFailed = true;
+        _reportLoading = false;
+      });
+    }
     _revealPreview();
   }
 
@@ -444,7 +480,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (picked != null && mounted) {
       setState(() {
         apply(picked);
-        _reportFuture = null;
+        _report = null;
+        _previewFailed = false;
+        _reportLoading = false;
+        _requestVersion++;
       });
     }
   }

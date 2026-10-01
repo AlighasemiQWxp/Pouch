@@ -78,7 +78,7 @@ class _PlannedScreenState extends State<PlannedScreen> {
                 child: SizedBox(
                   width: 170,
                   child: DropdownButtonFormField<String>(
-                    value: _statusFilter,
+                    initialValue: _statusFilter,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 10),
@@ -596,7 +596,7 @@ class _PlannedDialogState extends State<_PlannedDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<String>(
-            value: _kind,
+            initialValue: _kind,
             decoration: InputDecoration(
               labelText: widget.strings.text('plannedType'),
             ),
@@ -637,7 +637,7 @@ class _PlannedDialogState extends State<_PlannedDialog> {
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            value: _category,
+            initialValue: _category,
             decoration: InputDecoration(
               labelText: widget.strings.text('category'),
             ),

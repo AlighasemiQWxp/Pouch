@@ -114,7 +114,7 @@ class PouchSectionHeading extends StatelessWidget {
               ?.copyWith(color: context.pouchPalette.ink, fontWeight: FontWeight.w700),
         ),
       ),
-      if (trailing != null) trailing!,
+      ?trailing,
     ],
   );
 }

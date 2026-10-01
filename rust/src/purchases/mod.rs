@@ -2,7 +2,7 @@ use chrono::Local;
 
 use crate::{
     AppState, Date, Money, PouchError, PouchResult,
-    models::{Category, DailyRecord, PlannedStatus, Purchase},
+    models::{Category, PlannedStatus, Purchase},
 };
 
 pub fn add(
@@ -14,7 +14,7 @@ pub fn add(
     category: Category,
 ) -> PouchResult<()> {
     validate_new_purchase(state, &id, date, &description, amount)?;
-    let day = state.days.entry(date).or_insert_with(DailyRecord::default);
+    let day = state.days.entry(date).or_default();
     if day.purchases.iter().any(|purchase| purchase.id == id) {
         return Err(PouchError::InvalidEntry);
     }
@@ -78,7 +78,7 @@ pub fn set_daily_override(
         return Err(PouchError::InvalidDate);
     }
     date.to_naive_date()?;
-    let day = state.days.entry(date).or_insert_with(DailyRecord::default);
+    let day = state.days.entry(date).or_default();
     day.budget_override = amount;
     Ok(())
 }

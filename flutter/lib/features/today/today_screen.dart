@@ -52,10 +52,7 @@ class _TodayScreenState extends State<TodayScreen> {
       _summary = widget.bridge.budgetSummary(widget.selectedDate);
       _overrideController.text = _currentOverride == null
           ? ''
-          : amountInput(
-              _currentOverride!,
-              language: widget.strings.language,
-            );
+          : amountInput(_currentOverride!, language: widget.strings.language);
     }
   }
 
@@ -74,18 +71,12 @@ class _TodayScreenState extends State<TodayScreen> {
     final day = widget.snapshot.day(widget.selectedDate);
     final plannedForDay = widget.snapshot.planned
         .where(
-          (item) =>
-              item.date == widget.selectedDate && item.kind == 'expense',
+          (item) => item.date == widget.selectedDate && item.kind == 'expense',
         )
         .toList(growable: false);
     final isFuture = widget.selectedDate.compareTo(widget.today) > 0;
     return PouchPage(
       children: [
-        PouchIntro(
-          eyebrow: strings.text('tagline'),
-          title: strings.text('headline'),
-          description: strings.text('intro'),
-        ),
         _buildDateBar(context),
         const SizedBox(height: 14),
         FutureBuilder<PouchBudgetSummary>(
@@ -306,10 +297,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   children: [
                     Text(
                       strings.text('periodEnds'),
-                      style: TextStyle(
-                        color: Color(0xFFD2C4A8),
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Color(0xFFD2C4A8), fontSize: 12),
                     ),
                     FutureBuilder<String>(
                       future: _formatDate(summary.periodEnd),
@@ -585,7 +573,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   ),
                 );
                 final category = DropdownButtonFormField<String>(
-                  value: _purchaseCategory,
+                  initialValue: _purchaseCategory,
                   decoration: InputDecoration(
                     labelText: widget.strings.text('category'),
                   ),
@@ -622,17 +610,26 @@ class _TodayScreenState extends State<TodayScreen> {
             if (isFuture && purchases.isEmpty)
               Text(
                 widget.strings.text('plannedFuture'),
-                style: TextStyle(color: context.pouchPalette.muted, height: 1.55),
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  height: 1.55,
+                ),
               )
             else if (purchases.isEmpty)
               Text(
                 widget.strings.text('noPurchases'),
-                style: TextStyle(color: context.pouchPalette.muted, height: 1.55),
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  height: 1.55,
+                ),
               )
             else if (visible.isEmpty)
               Text(
                 widget.strings.text('noMatches'),
-                style: TextStyle(color: context.pouchPalette.muted, height: 1.55),
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  height: 1.55,
+                ),
               )
             else
               for (final purchase in visible)
@@ -722,7 +719,9 @@ class _AmountRow extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: bold ? context.pouchPalette.ink : context.pouchPalette.muted,
+              color: bold
+                  ? context.pouchPalette.ink
+                  : context.pouchPalette.muted,
               fontSize: 12,
               fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
             ),
@@ -735,7 +734,9 @@ class _AmountRow extends StatelessWidget {
             _ScreenScope.of(context).strings,
           ),
           style: TextStyle(
-            color: bold ? context.pouchPalette.goldDeep : context.pouchPalette.ink,
+            color: bold
+                ? context.pouchPalette.goldDeep
+                : context.pouchPalette.ink,
             fontSize: 12,
             fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
           ),
@@ -829,7 +830,7 @@ class _PurchaseFormState extends State<_PurchaseForm> {
                 ),
               );
               final category = DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: InputDecoration(
                   labelText: widget.strings.text('category'),
                 ),
@@ -887,7 +888,7 @@ class _PurchaseFormState extends State<_PurchaseForm> {
                     category: _category,
                   );
                 });
-                if (saved && mounted) {
+                if (saved && context.mounted) {
                   _description.clear();
                   _amount.clear();
                   setState(() => _category = 'other');
@@ -955,7 +956,10 @@ class _PurchaseTile extends StatelessWidget {
               ),
               Text(
                 categoryLabel,
-                style: TextStyle(color: context.pouchPalette.muted, fontSize: 11),
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  fontSize: 11,
+                ),
               ),
             ],
           );
@@ -1058,15 +1062,13 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
         const SizedBox(height: 8),
         TextField(
           controller: _amount,
-          inputFormatters: [
-            PouchMoneyInputFormatter(widget.strings.language),
-          ],
+          inputFormatters: [PouchMoneyInputFormatter(widget.strings.language)],
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(labelText: widget.strings.text('amount')),
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _category,
+          initialValue: _category,
           decoration: InputDecoration(
             labelText: widget.strings.text('category'),
           ),

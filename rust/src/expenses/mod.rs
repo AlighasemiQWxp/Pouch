@@ -2,7 +2,7 @@ use chrono::Local;
 
 use crate::{
     AppState, Date, Money, PouchError, PouchResult,
-    models::{Category, DailyRecord, PlannedItem, PlannedKind, PlannedStatus, Purchase},
+    models::{Category, PlannedItem, PlannedKind, PlannedStatus, Purchase},
 };
 
 pub fn save_planned(state: &mut AppState, item: PlannedItem) -> PouchResult<()> {
@@ -83,10 +83,7 @@ pub fn mark_paid(
         category: planned.category,
         funded_by_goal: planned.kind == PlannedKind::Goal,
     };
-    let day = state
-        .days
-        .entry(paid_date)
-        .or_insert_with(DailyRecord::default);
+    let day = state.days.entry(paid_date).or_default();
     day.purchases.push(purchase);
     planned.status = PlannedStatus::Paid;
     planned.paid_date = Some(paid_date);

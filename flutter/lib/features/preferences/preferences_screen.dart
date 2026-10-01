@@ -37,6 +37,16 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   Widget build(BuildContext context) {
     final strings = widget.strings;
     final preferences = widget.snapshot.preferences;
+    const countries = {
+      'iran': 'countryIran',
+      'canada': 'countryCanada',
+      'united_states': 'countryUnitedStates',
+      'united_kingdom': 'countryUnitedKingdom',
+      'germany': 'countryGermany',
+      'australia': 'countryAustralia',
+      'new_zealand': 'countryNewZealand',
+      'custom': 'countryCustom',
+    };
     return PouchPage(
       children: [
         PouchIntro(
@@ -51,7 +61,30 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               PouchSectionHeading(title: strings.text('displaySettings')),
               const SizedBox(height: 13),
               DropdownButtonFormField<String>(
-                value: preferences.currency,
+                initialValue: preferences.country,
+                decoration: InputDecoration(labelText: strings.text('country')),
+                items: countries.entries
+                    .map(
+                      (entry) => DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(strings.text(entry.value)),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: _busy ? null : (value) => _update(country: value),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                strings.text('countryHint'),
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 13),
+              DropdownButtonFormField<String>(
+                initialValue: preferences.currency,
                 decoration: InputDecoration(
                   labelText: strings.text('currency'),
                 ),
@@ -74,7 +107,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ),
               const SizedBox(height: 13),
               DropdownButtonFormField<String>(
-                value: preferences.calendar,
+                initialValue: preferences.calendar,
                 decoration: InputDecoration(
                   labelText: strings.text('displayCalendar'),
                 ),
@@ -92,7 +125,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ),
               const SizedBox(height: 13),
               DropdownButtonFormField<String>(
-                value: widget.themeStyle,
+                initialValue: widget.themeStyle,
                 decoration: InputDecoration(
                   labelText: strings.text('themeStyle'),
                 ),
@@ -117,7 +150,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<int>(
-                value: preferences.weekStart,
+                initialValue: preferences.weekStart,
                 decoration: InputDecoration(
                   labelText: strings.text('weekStart'),
                 ),
@@ -202,11 +235,17 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       onPressed: _busy ? null : action,
       icon: Icon(
         icon,
-        color: danger ? context.pouchPalette.danger : context.pouchPalette.goldDeep,
+        color: danger
+            ? context.pouchPalette.danger
+            : context.pouchPalette.goldDeep,
       ),
       label: Text(
         widget.strings.text(key),
-        style: TextStyle(color: danger ? context.pouchPalette.danger : context.pouchPalette.ink),
+        style: TextStyle(
+          color: danger
+              ? context.pouchPalette.danger
+              : context.pouchPalette.ink,
+        ),
       ),
       style: OutlinedButton.styleFrom(
         alignment: AlignmentDirectional.centerStart,
@@ -216,12 +255,14 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
   );
 
   Future<void> _update({
+    String? country,
     String? currency,
     String? calendar,
     int? weekStart,
   }) async {
     await widget.run(
       () => widget.bridge.updatePreferences(
+        country: country ?? widget.snapshot.preferences.country,
         currency: currency ?? widget.snapshot.preferences.currency,
         language: widget.snapshot.preferences.language,
         calendar: calendar ?? widget.snapshot.preferences.calendar,
@@ -304,8 +345,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       final restored = await widget.run(
         () => widget.bridge.importBackup(contents),
       );
-      if (restored && mounted)
+      if (restored && mounted) {
         showPouchMessage(context, widget.strings, 'restored');
+      }
     } catch (_) {
       if (mounted) showPouchMessage(context, widget.strings, 'invalidData');
     } finally {
@@ -333,7 +375,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     );
     if (approved != true) return;
     final accepted = await widget.run(() => widget.bridge.reset());
-    if (accepted && mounted)
+    if (accepted && mounted) {
       showPouchMessage(context, widget.strings, 'resetDone');
+    }
   }
 }

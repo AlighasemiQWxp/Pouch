@@ -8,6 +8,13 @@ use atomicwrites::{AllowOverwrite, AtomicFile};
 use serde::{Deserialize, Serialize};
 
 use crate::{AppState, PouchError, PouchResult};
+use crate::{
+    Date,
+    models::{
+        BudgetPlan, Calendar, Country, Currency, DailyRecord, IncomeEntry, Language, PlannedItem,
+        Preferences, WeekStart,
+    },
+};
 
 const MAGIC: &[u8; 8] = b"POUCHDAT";
 const FILE_FORMAT_VERSION: u16 = 1;
@@ -18,6 +25,31 @@ const MAX_FILE_LENGTH: usize = 5_000_000;
 struct StorageEnvelope {
     schema_version: u16,
     state: AppState,
+}
+
+#[derive(Deserialize, Serialize)]
+struct StorageEnvelopeV1 {
+    schema_version: u16,
+    state: AppStateV1,
+}
+
+#[derive(Deserialize, Serialize)]
+struct AppStateV1 {
+    schema_version: u16,
+    start_date: Date,
+    preferences: PreferencesV1,
+    income: Vec<IncomeEntry>,
+    plans: Vec<BudgetPlan>,
+    days: std::collections::BTreeMap<Date, DailyRecord>,
+    planned: Vec<PlannedItem>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct PreferencesV1 {
+    currency: Currency,
+    language: Language,
+    calendar: Calendar,
+    week_start: WeekStart,
 }
 
 pub struct LoadedState {
@@ -179,19 +211,51 @@ fn decode(bytes: &[u8]) -> PouchResult<AppState> {
         return Err(PouchError::CorruptStorage);
     }
 
-    let envelope: StorageEnvelope =
-        postcard::from_bytes(payload).map_err(|_| PouchError::CorruptStorage)?;
-    if envelope.schema_version > AppState::CURRENT_SCHEMA_VERSION {
-        return Err(PouchError::UnsupportedStorageVersion);
+    let (stored_schema_version, _) =
+        postcard::take_from_bytes::<u16>(payload).map_err(|_| PouchError::CorruptStorage)?;
+    let state = match stored_schema_version {
+        1 => migrate_v1(
+            postcard::from_bytes::<StorageEnvelopeV1>(payload)
+                .map_err(|_| PouchError::CorruptStorage)?,
+        )?,
+        version if version == AppState::CURRENT_SCHEMA_VERSION => {
+            let envelope: StorageEnvelope =
+                postcard::from_bytes(payload).map_err(|_| PouchError::CorruptStorage)?;
+            if envelope.schema_version != version {
+                return Err(PouchError::CorruptStorage);
+            }
+            envelope.state
+        }
+        version if version > AppState::CURRENT_SCHEMA_VERSION => {
+            return Err(PouchError::UnsupportedStorageVersion);
+        }
+        _ => return Err(PouchError::UnsupportedStorageVersion),
+    };
+    state.validate().map_err(|_| PouchError::CorruptStorage)?;
+    Ok(state)
+}
+
+fn migrate_v1(envelope: StorageEnvelopeV1) -> PouchResult<AppState> {
+    if envelope.schema_version != 1 || envelope.state.schema_version != 1 {
+        return Err(PouchError::CorruptStorage);
     }
-    if envelope.schema_version != AppState::CURRENT_SCHEMA_VERSION {
-        return Err(PouchError::UnsupportedStorageVersion);
-    }
-    envelope
-        .state
-        .validate()
-        .map_err(|_| PouchError::CorruptStorage)?;
-    Ok(envelope.state)
+    let old = envelope.state;
+    Ok(AppState {
+        schema_version: AppState::CURRENT_SCHEMA_VERSION,
+        start_date: old.start_date,
+        preferences: Preferences {
+            country: Country::Custom,
+            currency: old.preferences.currency,
+            language: old.preferences.language,
+            calendar: old.preferences.calendar,
+            week_start: old.preferences.week_start,
+        },
+        income: old.income,
+        expected_income: Vec::new(),
+        plans: old.plans,
+        days: old.days,
+        planned: old.planned,
+    })
 }
 
 fn read_optional(path: &Path) -> PouchResult<Option<Vec<u8>>> {
@@ -226,8 +290,49 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> PouchResult<()> {
 mod tests {
     use std::{fs, io::Write};
 
-    use super::BinaryStore;
-    use crate::{AppState, Date, PouchError};
+    use super::{
+        AppStateV1, BinaryStore, FILE_FORMAT_VERSION, HEADER_LENGTH, MAGIC, PreferencesV1,
+        StorageEnvelopeV1, decode,
+    };
+    use crate::{
+        AppState, Date, Money, PouchError,
+        models::{Calendar, Country, Currency, IncomeEntry, Language, WeekStart},
+    };
+
+    fn encode_v1_state(date: Date) -> Vec<u8> {
+        let mut state = AppState::fresh(date);
+        state.plans[0].calendar = Calendar::Gregorian;
+        let old_state = AppStateV1 {
+            schema_version: 1,
+            start_date: date,
+            preferences: PreferencesV1 {
+                currency: Currency::Cad,
+                language: Language::Persian,
+                calendar: Calendar::Gregorian,
+                week_start: WeekStart::Monday,
+            },
+            income: vec![IncomeEntry {
+                id: "recorded-income".into(),
+                date,
+                amount: Money::from_hundredths(12500).expect("the income is valid"),
+            }],
+            plans: state.plans,
+            days: state.days,
+            planned: state.planned,
+        };
+        let payload = postcard::to_allocvec(&StorageEnvelopeV1 {
+            schema_version: 1,
+            state: old_state,
+        })
+        .expect("the legacy state serializes");
+        let mut bytes = Vec::with_capacity(HEADER_LENGTH + payload.len());
+        bytes.extend_from_slice(MAGIC);
+        bytes.extend_from_slice(&FILE_FORMAT_VERSION.to_le_bytes());
+        bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&crc32fast::hash(&payload).to_le_bytes());
+        bytes.extend_from_slice(&payload);
+        bytes
+    }
 
     #[test]
     fn binary_file_round_trip_keeps_versioned_state() {
@@ -246,6 +351,22 @@ mod tests {
             store.load_recovery_copy().expect("recovery should load"),
             Some(expected)
         );
+    }
+
+    #[test]
+    fn version_one_state_migrates_without_changing_existing_preferences() {
+        let date = Date::parse_iso("2026-09-21").expect("the date should be valid");
+        let migrated = decode(&encode_v1_state(date)).expect("the old state migrates");
+
+        assert_eq!(migrated.schema_version, AppState::CURRENT_SCHEMA_VERSION);
+        assert_eq!(migrated.preferences.country, Country::Custom);
+        assert_eq!(migrated.preferences.currency, Currency::Cad);
+        assert_eq!(migrated.preferences.language, Language::Persian);
+        assert_eq!(migrated.preferences.calendar, Calendar::Gregorian);
+        assert_eq!(migrated.preferences.week_start, WeekStart::Monday);
+        assert!(migrated.expected_income.is_empty());
+        assert_eq!(migrated.income.len(), 1);
+        assert_eq!(migrated.income[0].id, "recorded-income");
     }
 
     #[test]

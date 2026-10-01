@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'package:pouch/src/rust/frb_generated.dart';
+import 'package:pouch/src/rust/api.dart';
 
 import 'pouch_models.dart';
 
@@ -16,7 +16,7 @@ class PouchExpenseDraft {
 class PouchBridge {
   static const MethodChannel _native = MethodChannel('com.daybook.app/legacy');
 
-  dynamic _session;
+  late PouchApp _session;
 
   Future<String> loadThemeStyle() async {
     try {
@@ -27,24 +27,23 @@ class PouchBridge {
   }
 
   Future<void> saveThemeStyle(String style) async {
-    await _native.invokeMethod<void>(
-      'setThemeStyle',
-      <String, Object>{'style': style},
-    );
+    await _native.invokeMethod<void>('setThemeStyle', <String, Object>{
+      'style': style,
+    });
   }
 
   Future<PouchSnapshot> open() async {
     final bootstrap = await _native.invokeMapMethod<String, Object?>(
       'getBootstrapData',
     );
-    if (bootstrap == null)
+    if (bootstrap == null) {
       throw StateError('Pouch could not read its Android storage location.');
+    }
     final dataDirectory = bootstrap['dataDirectory'] as String?;
     if (dataDirectory == null || dataDirectory.isEmpty) {
       throw StateError('Pouch could not read its Android storage location.');
     }
 
-    final dynamic api = RustLib.instance.api;
     final legacyJsonCandidates =
         [
               bootstrap['legacyPrimary'],
@@ -55,7 +54,7 @@ class PouchBridge {
             .where((value) => value.isNotEmpty)
             .toSet()
             .toList(growable: false);
-    _session = await api.crateApiPouchAppOpen(
+    _session = await PouchApp.open(
       applicationDataDirectory: dataDirectory,
       legacyJsonCandidates: legacyJsonCandidates,
     );
@@ -64,7 +63,7 @@ class PouchBridge {
     return PouchSnapshot.fromBridge(raw);
   }
 
-  Future<String> today() async => await _session.today() as String;
+  Future<String> today() => _session.today();
 
   Future<(int year, int month, int day)> dateParts(
     String date,
@@ -94,12 +93,12 @@ class PouchBridge {
     required int month,
     required int day,
     required String calendar,
-  }) async => await _session.calendarDate(
+  }) => _session.calendarDate(
     year: year,
     month: month,
     day: day,
     calendar: calendar,
-  ) as String;
+  );
 
   Future<PouchSnapshot> snapshot() async =>
       PouchSnapshot.fromBridge(await _session.snapshot());
@@ -108,12 +107,14 @@ class PouchBridge {
       PouchBudgetSummary.fromBridge(await _session.budgetSummary(date: date));
 
   Future<PouchSnapshot> updatePreferences({
+    required String country,
     required String currency,
     required String language,
     required String calendar,
     required int weekStart,
   }) async => PouchSnapshot.fromBridge(
     await _session.updatePreferences(
+      country: country,
       currency: currency,
       language: language,
       calendar: calendar,
@@ -178,6 +179,35 @@ class PouchBridge {
   }) async => PouchSnapshot.fromBridge(
     await _session.updateIncome(id: id, date: date, amount: amount),
   );
+
+  Future<PouchSnapshot> scheduleIncome({
+    required String id,
+    required String date,
+    required String amount,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.scheduleIncome(id: id, date: date, amount: amount),
+  );
+
+  Future<PouchSnapshot> updateExpectedIncome({
+    required String id,
+    required String date,
+    required String amount,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.updateExpectedIncome(id: id, date: date, amount: amount),
+  );
+
+  Future<PouchSnapshot> markExpectedIncomeReceived({
+    required String id,
+    required String receivedDate,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.markExpectedIncomeReceived(
+      id: id,
+      receivedDate: receivedDate,
+    ),
+  );
+
+  Future<PouchSnapshot> removeExpectedIncome(String id) async =>
+      PouchSnapshot.fromBridge(await _session.removeExpectedIncome(id: id));
 
   Future<PouchSnapshot> removeIncome(String id) async =>
       PouchSnapshot.fromBridge(await _session.removeIncome(id: id));
@@ -247,11 +277,9 @@ class PouchBridge {
     ),
   );
 
-  Future<String> exportBackup() async =>
-      await _session.exportBackup() as String;
+  Future<String> exportBackup() => _session.exportBackup();
 
-  Future<String> exportRecoveryBackup() async =>
-      await _session.exportRecoveryBackup() as String;
+  Future<String> exportRecoveryBackup() => _session.exportRecoveryBackup();
 
   Future<PouchSnapshot> importBackup(String contents) async =>
       PouchSnapshot.fromBridge(await _session.importBackup(contents: contents));

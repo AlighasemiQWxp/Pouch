@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -686379110;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 10169480;
 
 // Section: executor
 
@@ -589,6 +589,61 @@ fn wire__crate__api__PouchApp_import_backup_impl(
         },
     )
 }
+fn wire__crate__api__PouchApp_mark_expected_income_received_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PouchApp_mark_expected_income_received",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>,
+            >>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            let api_received_date = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, true,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref_mut()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let mut api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::PouchApp::mark_expected_income_received(
+                        &mut *api_that_guard,
+                        api_id,
+                        api_received_date,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__PouchApp_mark_planned_paid_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -789,6 +844,57 @@ fn wire__crate__api__PouchApp_remove_budget_plan_impl(
                         &mut *api_that_guard,
                         api_effective,
                     )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__PouchApp_remove_expected_income_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PouchApp_remove_expected_income",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>,
+            >>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, true,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref_mut()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let mut api_that_guard = api_that_guard.unwrap();
+                    let output_ok =
+                        crate::api::PouchApp::remove_expected_income(&mut *api_that_guard, api_id)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1347,6 +1453,63 @@ fn wire__crate__api__PouchApp_save_planned_impl(
         },
     )
 }
+fn wire__crate__api__PouchApp_schedule_income_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PouchApp_schedule_income",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>,
+            >>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            let api_date = <String>::sse_decode(&mut deserializer);
+            let api_amount = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, true,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref_mut()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let mut api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::PouchApp::schedule_income(
+                        &mut *api_that_guard,
+                        api_id,
+                        api_date,
+                        api_amount,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__PouchApp_set_daily_override_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1549,6 +1712,63 @@ fn wire__crate__api__PouchApp_undo_last_change_impl(
         },
     )
 }
+fn wire__crate__api__PouchApp_update_expected_income_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PouchApp_update_expected_income",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>,
+            >>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            let api_date = <String>::sse_decode(&mut deserializer);
+            let api_amount = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, true,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref_mut()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let mut api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::PouchApp::update_expected_income(
+                        &mut *api_that_guard,
+                        api_id,
+                        api_date,
+                        api_amount,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__PouchApp_update_income_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1631,6 +1851,7 @@ fn wire__crate__api__PouchApp_update_preferences_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>,
             >>::sse_decode(&mut deserializer);
+            let api_country = <String>::sse_decode(&mut deserializer);
             let api_currency = <String>::sse_decode(&mut deserializer);
             let api_language = <String>::sse_decode(&mut deserializer);
             let api_calendar = <String>::sse_decode(&mut deserializer);
@@ -1654,6 +1875,7 @@ fn wire__crate__api__PouchApp_update_preferences_impl(
                     let mut api_that_guard = api_that_guard.unwrap();
                     let output_ok = crate::api::PouchApp::update_preferences(
                         &mut *api_that_guard,
+                        api_country,
                         api_currency,
                         api_language,
                         api_calendar,
@@ -1711,6 +1933,8 @@ impl SseDecode for crate::api::AppSnapshot {
         let mut var_startDate = <String>::sse_decode(deserializer);
         let mut var_preferences = <crate::api::PreferencesSnapshot>::sse_decode(deserializer);
         let mut var_income = <Vec<crate::api::IncomeSnapshot>>::sse_decode(deserializer);
+        let mut var_expectedIncome =
+            <Vec<crate::api::ExpectedIncomeSnapshot>>::sse_decode(deserializer);
         let mut var_plans = <Vec<crate::api::BudgetPlanSnapshot>>::sse_decode(deserializer);
         let mut var_days = <Vec<crate::api::DaySnapshot>>::sse_decode(deserializer);
         let mut var_planned = <Vec<crate::api::PlannedSnapshot>>::sse_decode(deserializer);
@@ -1721,6 +1945,7 @@ impl SseDecode for crate::api::AppSnapshot {
             start_date: var_startDate,
             preferences: var_preferences,
             income: var_income,
+            expected_income: var_expectedIncome,
             plans: var_plans,
             days: var_days,
             planned: var_planned,
@@ -1865,6 +2090,20 @@ impl SseDecode for crate::api::DaySnapshot {
     }
 }
 
+impl SseDecode for crate::api::ExpectedIncomeSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_date = <String>::sse_decode(deserializer);
+        let mut var_amount = <i64>::sse_decode(deserializer);
+        return crate::api::ExpectedIncomeSnapshot {
+            id: var_id,
+            date: var_date,
+            amount: var_amount,
+        };
+    }
+}
+
 impl SseDecode for crate::api::GoalForecastSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1972,6 +2211,20 @@ impl SseDecode for Vec<crate::api::DaySnapshot> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::DaySnapshot>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::ExpectedIncomeSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::ExpectedIncomeSnapshot>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -2146,11 +2399,13 @@ impl SseDecode for crate::api::PlannedSnapshot {
 impl SseDecode for crate::api::PreferencesSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_country = <String>::sse_decode(deserializer);
         let mut var_currency = <String>::sse_decode(deserializer);
         let mut var_language = <String>::sse_decode(deserializer);
         let mut var_calendar = <String>::sse_decode(deserializer);
         let mut var_weekStart = <i32>::sse_decode(deserializer);
         return crate::api::PreferencesSnapshot {
+            country: var_country,
             currency: var_currency,
             language: var_language,
             calendar: var_calendar,
@@ -2278,26 +2533,45 @@ fn pde_ffi_dispatcher_primary_impl(
         ),
         9 => wire__crate__api__PouchApp_goal_forecast_impl(port, ptr, rust_vec_len, data_len),
         10 => wire__crate__api__PouchApp_import_backup_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__PouchApp_mark_planned_paid_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__PouchApp_open_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__PouchApp_record_income_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__PouchApp_remove_budget_plan_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__PouchApp_remove_income_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__PouchApp_remove_planned_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__PouchApp_remove_purchase_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__PouchApp_report_month_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__PouchApp_report_range_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__PouchApp_report_specific_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__PouchApp_report_week_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__PouchApp_reset_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__PouchApp_save_budget_plan_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__PouchApp_save_planned_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__PouchApp_set_daily_override_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__PouchApp_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__PouchApp_today_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__PouchApp_undo_last_change_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__PouchApp_update_income_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__PouchApp_update_preferences_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__PouchApp_mark_expected_income_received_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        12 => wire__crate__api__PouchApp_mark_planned_paid_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__PouchApp_open_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__PouchApp_record_income_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__PouchApp_remove_budget_plan_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__PouchApp_remove_expected_income_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        17 => wire__crate__api__PouchApp_remove_income_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__PouchApp_remove_planned_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__PouchApp_remove_purchase_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__PouchApp_report_month_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__PouchApp_report_range_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__PouchApp_report_specific_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__PouchApp_report_week_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__PouchApp_reset_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__PouchApp_save_budget_plan_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__PouchApp_save_planned_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__PouchApp_schedule_income_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__PouchApp_set_daily_override_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__PouchApp_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__PouchApp_today_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__PouchApp_undo_last_change_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__PouchApp_update_expected_income_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        33 => wire__crate__api__PouchApp_update_income_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__PouchApp_update_preferences_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2341,6 +2615,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::AppSnapshot {
             self.start_date.into_into_dart().into_dart(),
             self.preferences.into_into_dart().into_dart(),
             self.income.into_into_dart().into_dart(),
+            self.expected_income.into_into_dart().into_dart(),
             self.plans.into_into_dart().into_dart(),
             self.days.into_into_dart().into_dart(),
             self.planned.into_into_dart().into_dart(),
@@ -2512,6 +2787,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::DaySnapshot> for crate::api::
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ExpectedIncomeSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.date.into_into_dart().into_dart(),
+            self.amount.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ExpectedIncomeSnapshot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ExpectedIncomeSnapshot>
+    for crate::api::ExpectedIncomeSnapshot
+{
+    fn into_into_dart(self) -> crate::api::ExpectedIncomeSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::GoalForecastSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2607,6 +2904,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::PlannedSnapshot>
 impl flutter_rust_bridge::IntoDart for crate::api::PreferencesSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.country.into_into_dart().into_dart(),
             self.currency.into_into_dart().into_dart(),
             self.language.into_into_dart().into_dart(),
             self.calendar.into_into_dart().into_dart(),
@@ -2750,6 +3048,7 @@ impl SseEncode for crate::api::AppSnapshot {
         <String>::sse_encode(self.start_date, serializer);
         <crate::api::PreferencesSnapshot>::sse_encode(self.preferences, serializer);
         <Vec<crate::api::IncomeSnapshot>>::sse_encode(self.income, serializer);
+        <Vec<crate::api::ExpectedIncomeSnapshot>>::sse_encode(self.expected_income, serializer);
         <Vec<crate::api::BudgetPlanSnapshot>>::sse_encode(self.plans, serializer);
         <Vec<crate::api::DaySnapshot>>::sse_encode(self.days, serializer);
         <Vec<crate::api::PlannedSnapshot>>::sse_encode(self.planned, serializer);
@@ -2842,6 +3141,15 @@ impl SseEncode for crate::api::DaySnapshot {
     }
 }
 
+impl SseEncode for crate::api::ExpectedIncomeSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.date, serializer);
+        <i64>::sse_encode(self.amount, serializer);
+    }
+}
+
 impl SseEncode for crate::api::GoalForecastSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2924,6 +3232,16 @@ impl SseEncode for Vec<crate::api::DaySnapshot> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::DaySnapshot>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::ExpectedIncomeSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::ExpectedIncomeSnapshot>::sse_encode(item, serializer);
         }
     }
 }
@@ -3057,6 +3375,7 @@ impl SseEncode for crate::api::PlannedSnapshot {
 impl SseEncode for crate::api::PreferencesSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.country, serializer);
         <String>::sse_encode(self.currency, serializer);
         <String>::sse_encode(self.language, serializer);
         <String>::sse_encode(self.calendar, serializer);

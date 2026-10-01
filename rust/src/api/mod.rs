@@ -70,12 +70,14 @@ impl PouchApp {
 
     pub fn update_preferences(
         &mut self,
+        country: String,
         currency: String,
         language: String,
         calendar: String,
         week_start: i32,
     ) -> Result<AppSnapshot, String> {
         let preferences = Preferences {
+            country: parse_country(&country)?,
             currency: parse_currency(&currency)?,
             language: parse_language(&language)?,
             calendar: parse_calendar(&calendar)?,
@@ -195,6 +197,55 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
+    pub fn schedule_income(
+        &mut self,
+        id: String,
+        date: String,
+        amount: String,
+    ) -> Result<AppSnapshot, String> {
+        let date = parse_date(&date)?;
+        let amount = parse_amount(&amount)?;
+        self.core
+            .apply(|state| crate::income::schedule(state, id, date, amount))
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn update_expected_income(
+        &mut self,
+        id: String,
+        date: String,
+        amount: String,
+    ) -> Result<AppSnapshot, String> {
+        let date = parse_date(&date)?;
+        let amount = parse_amount(&amount)?;
+        self.core
+            .apply(|state| crate::income::edit_expected(state, &id, date, amount))
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn mark_expected_income_received(
+        &mut self,
+        id: String,
+        received_date: String,
+    ) -> Result<AppSnapshot, String> {
+        let received_date = parse_date(&received_date)?;
+        self.core
+            .apply_reversible(|state| {
+                crate::income::mark_expected_received(state, &id, received_date)
+            })
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn remove_expected_income(&mut self, id: String) -> Result<AppSnapshot, String> {
+        self.core
+            .apply_reversible(|state| crate::income::remove_expected(state, &id))
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
     pub fn remove_income(&mut self, id: String) -> Result<AppSnapshot, String> {
         self.core
             .apply_reversible(|state| crate::income::remove(state, &id))
@@ -210,6 +261,7 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn save_budget_plan(
         &mut self,
         effective: String,
@@ -398,12 +450,14 @@ pub struct AppSnapshot {
     pub start_date: String,
     pub preferences: PreferencesSnapshot,
     pub income: Vec<IncomeSnapshot>,
+    pub expected_income: Vec<ExpectedIncomeSnapshot>,
     pub plans: Vec<BudgetPlanSnapshot>,
     pub days: Vec<DaySnapshot>,
     pub planned: Vec<PlannedSnapshot>,
 }
 
 pub struct PreferencesSnapshot {
+    pub country: String,
     pub currency: String,
     pub language: String,
     pub calendar: String,
@@ -411,6 +465,12 @@ pub struct PreferencesSnapshot {
 }
 
 pub struct IncomeSnapshot {
+    pub id: String,
+    pub date: String,
+    pub amount: i64,
+}
+
+pub struct ExpectedIncomeSnapshot {
     pub id: String,
     pub date: String,
     pub amount: i64,
@@ -607,6 +667,7 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
     let state = core.state();
     let start_date = state.start_date.iso().map_err(|error| error.to_string())?;
     let preferences = PreferencesSnapshot {
+        country: country_name(state.preferences.country).to_owned(),
         currency: currency_name(state.preferences.currency).to_owned(),
         language: language_name(state.preferences.language).to_owned(),
         calendar: calendar_name(state.preferences.calendar).to_owned(),
@@ -617,6 +678,17 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
         .iter()
         .map(|entry| {
             Ok(IncomeSnapshot {
+                id: entry.id.clone(),
+                date: entry.date.iso().map_err(|error| error.to_string())?,
+                amount: entry.amount.hundredths(),
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let expected_income = state
+        .expected_income
+        .iter()
+        .map(|entry| {
+            Ok(ExpectedIncomeSnapshot {
                 id: entry.id.clone(),
                 date: entry.date.iso().map_err(|error| error.to_string())?,
                 amount: entry.amount.hundredths(),
@@ -696,6 +768,7 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
         start_date,
         preferences,
         income,
+        expected_income,
         plans,
         days,
         planned,
@@ -712,6 +785,33 @@ fn parse_currency(value: &str) -> Result<Currency, String> {
         "AUD" => Ok(Currency::Aud),
         "NZD" => Ok(Currency::Nzd),
         _ => Err("The currency preference is invalid.".into()),
+    }
+}
+
+fn parse_country(value: &str) -> Result<Country, String> {
+    match value {
+        "iran" => Ok(Country::Iran),
+        "canada" => Ok(Country::Canada),
+        "united_states" => Ok(Country::UnitedStates),
+        "united_kingdom" => Ok(Country::UnitedKingdom),
+        "germany" => Ok(Country::Germany),
+        "australia" => Ok(Country::Australia),
+        "new_zealand" => Ok(Country::NewZealand),
+        "custom" => Ok(Country::Custom),
+        _ => Err("The country preference is invalid.".into()),
+    }
+}
+
+fn country_name(value: Country) -> &'static str {
+    match value {
+        Country::Iran => "iran",
+        Country::Canada => "canada",
+        Country::UnitedStates => "united_states",
+        Country::UnitedKingdom => "united_kingdom",
+        Country::Germany => "germany",
+        Country::Australia => "australia",
+        Country::NewZealand => "new_zealand",
+        Country::Custom => "custom",
     }
 }
 

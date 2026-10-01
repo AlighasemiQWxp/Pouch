@@ -127,8 +127,9 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
       builder: (context, bounds) => FutureBuilder<PouchCalendarMonth>(
         future: _month,
         builder: (context, month) {
-          if (!bounds.hasData || !month.hasData)
+          if (!bounds.hasData || !month.hasData) {
             return const LinearProgressIndicator();
+          }
           final range = bounds.data!;
           final currentIndex = _monthIndex(month.data!);
           final minIndex = _monthIndex(range[0]);
@@ -160,16 +161,18 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
     content: FutureBuilder<PouchCalendarMonth>(
       future: _month,
       builder: (context, snapshot) {
-        if (snapshot.hasError)
+        if (snapshot.hasError) {
           return SizedBox(
             height: 280,
             child: Center(child: Text(widget.strings.text('invalidDate'))),
           );
-        if (!snapshot.hasData)
+        }
+        if (!snapshot.hasData) {
           return const SizedBox(
             height: 280,
             child: Center(child: CircularProgressIndicator()),
           );
+        }
         final month = snapshot.data!;
         final firstOffset = (month.firstWeekday - widget.weekStart + 7) % 7;
         final count = firstOffset + month.dayCount;

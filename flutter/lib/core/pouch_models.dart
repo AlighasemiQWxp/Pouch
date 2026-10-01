@@ -1,17 +1,20 @@
 class PouchPreferences {
   const PouchPreferences({
+    required this.country,
     required this.currency,
     required this.language,
     required this.calendar,
     required this.weekStart,
   });
 
+  final String country;
   final String currency;
   final String language;
   final String calendar;
   final int weekStart;
 
   factory PouchPreferences.fromBridge(dynamic value) => PouchPreferences(
+    country: value.country as String,
     currency: value.currency as String,
     language: value.language as String,
     calendar: value.calendar as String,
@@ -51,6 +54,20 @@ class PouchIncome {
   final int amount;
 
   factory PouchIncome.fromBridge(dynamic value) => PouchIncome(
+    value.id as String,
+    value.date as String,
+    value.amount as int,
+  );
+}
+
+class PouchExpectedIncome {
+  const PouchExpectedIncome(this.id, this.date, this.amount);
+
+  final String id;
+  final String date;
+  final int amount;
+
+  factory PouchExpectedIncome.fromBridge(dynamic value) => PouchExpectedIncome(
     value.id as String,
     value.date as String,
     value.amount as int,
@@ -191,6 +208,7 @@ class PouchSnapshot {
     required this.startDate,
     required this.preferences,
     required this.income,
+    required this.expectedIncome,
     required this.plans,
     required this.days,
     required this.planned,
@@ -202,6 +220,7 @@ class PouchSnapshot {
   final String startDate;
   final PouchPreferences preferences;
   final List<PouchIncome> income;
+  final List<PouchExpectedIncome> expectedIncome;
   final List<PouchBudgetPlan> plans;
   final List<PouchDay> days;
   final List<PouchPlannedItem> planned;
@@ -214,6 +233,9 @@ class PouchSnapshot {
     preferences: PouchPreferences.fromBridge(value.preferences),
     income: List<dynamic>.from(value.income as Iterable)
         .map(PouchIncome.fromBridge)
+        .toList(growable: false),
+    expectedIncome: List<dynamic>.from(value.expectedIncome as Iterable)
+        .map(PouchExpectedIncome.fromBridge)
         .toList(growable: false),
     plans: List<dynamic>.from(value.plans as Iterable)
         .map(PouchBudgetPlan.fromBridge)

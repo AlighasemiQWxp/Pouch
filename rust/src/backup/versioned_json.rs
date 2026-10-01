@@ -6,8 +6,9 @@ use serde_json::Value;
 use crate::{
     AppState, Date, PouchError, PouchResult,
     models::{
-        BudgetPlan, Calendar, Category, Currency, DailyRecord, IncomeEntry, Language, PlannedItem,
-        PlannedKind, PlannedStatus, Preferences, Purchase, RequiredExpense, WeekStart,
+        BudgetPlan, Calendar, Category, Country, Currency, DailyRecord, ExpectedIncomeEntry,
+        IncomeEntry, Language, PlannedItem, PlannedKind, PlannedStatus, Preferences, Purchase,
+        RequiredExpense, WeekStart,
     },
     money::Money,
 };
@@ -25,6 +26,7 @@ pub fn from_versioned_json(contents: &str) -> PouchResult<AppState> {
         .as_i64()
         .ok_or(PouchError::InvalidBackup)?;
     match version {
+        5 => from_v5(&source),
         4 => from_v4(&source),
         3 => {
             upgrade_v3(&mut source)?;
@@ -76,7 +78,11 @@ fn from_v1_or_v2(source: &Value, version: i64) -> PouchResult<AppState> {
     let start = Date::parse_iso(start_date)?;
     let today = Date::from_naive_date(Local::now().date_naive())?;
     let mut state = AppState::fresh(start);
+    state.preferences.country = Country::Custom;
     state.preferences.currency = currency(source, "currency")?;
+    state.preferences.calendar = Calendar::Gregorian;
+    state.preferences.week_start = WeekStart::Monday;
+    state.plans[0].calendar = Calendar::Gregorian;
     let first_plan = state.plans.first_mut().ok_or(PouchError::InvalidState)?;
     first_plan.daily_budget = money(source, "dailyBudget")?;
     first_plan.legacy = true;
@@ -133,16 +139,30 @@ fn from_v1_or_v2(source: &Value, version: i64) -> PouchResult<AppState> {
 }
 
 fn from_v4(source: &Value) -> PouchResult<AppState> {
+    from_document(source, false)
+}
+
+fn from_v5(source: &Value) -> PouchResult<AppState> {
+    from_document(source, true)
+}
+
+fn from_document(source: &Value, includes_regional_data: bool) -> PouchResult<AppState> {
     let mut state = AppState {
         schema_version: AppState::CURRENT_SCHEMA_VERSION,
         start_date: Date::parse_iso(date_string(source, "startDate")?)?,
         preferences: Preferences {
+            country: if includes_regional_data {
+                country(source, "country")?
+            } else {
+                Country::Custom
+            },
             currency: currency(source, "currency")?,
             language: language(source, "language")?,
             calendar: calendar(source, "calendar")?,
             week_start: week_start(source, "weekStart")?,
         },
         income: Vec::new(),
+        expected_income: Vec::new(),
         plans: Vec::new(),
         days: BTreeMap::new(),
         planned: Vec::new(),
@@ -154,6 +174,15 @@ fn from_v4(source: &Value) -> PouchResult<AppState> {
             date: Date::parse_iso(date_string(entry, "date")?)?,
             amount: money(entry, "amount")?,
         });
+    }
+    if includes_regional_data {
+        for entry in array(source, "expectedIncome")? {
+            state.expected_income.push(ExpectedIncomeEntry {
+                id: string(entry, "id")?.to_owned(),
+                date: Date::parse_iso(date_string(entry, "date")?)?,
+                amount: money(entry, "amount")?,
+            });
+        }
     }
     for plan in array(source, "plans")? {
         state.plans.push(BudgetPlan {
@@ -307,6 +336,20 @@ fn currency(value: &Value, key: &str) -> PouchResult<Currency> {
     }
 }
 
+fn country(value: &Value, key: &str) -> PouchResult<Country> {
+    match string(value, key)? {
+        "iran" => Ok(Country::Iran),
+        "canada" => Ok(Country::Canada),
+        "united_states" => Ok(Country::UnitedStates),
+        "united_kingdom" => Ok(Country::UnitedKingdom),
+        "germany" => Ok(Country::Germany),
+        "australia" => Ok(Country::Australia),
+        "new_zealand" => Ok(Country::NewZealand),
+        "custom" => Ok(Country::Custom),
+        _ => Err(PouchError::InvalidBackup),
+    }
+}
+
 fn language(value: &Value, key: &str) -> PouchResult<Language> {
     match string(value, key)? {
         "en" => Ok(Language::English),
@@ -436,5 +479,49 @@ mod tests {
         assert!(state.plans[0].legacy);
         assert_eq!(state.plans[0].monthly_savings.hundredths(), 0);
         assert_eq!(state.planned[0].kind, PlannedKind::Expense);
+    }
+
+    #[test]
+    fn version_five_restores_country_and_expected_income() {
+        let today = Local::now().date_naive();
+        let start = today.format("%Y-%m-%d").to_string();
+        let expected_date = (today + chrono::Duration::days(3))
+            .format("%Y-%m-%d")
+            .to_string();
+        let contents = json!({
+            "version": 5,
+            "startDate": start,
+            "country": "iran",
+            "currency": "TOMAN",
+            "language": "en",
+            "calendar": "persian",
+            "weekStart": 6,
+            "income": [],
+            "expectedIncome": [{
+                "id": "next-payday",
+                "date": expected_date,
+                "amount": 12500
+            }],
+            "plans": [{
+                "effective": start,
+                "salary": null,
+                "dailyBudget": 0,
+                "expenses": [],
+                "savings": 0,
+                "payday": 1,
+                "calendar": "persian",
+                "legacy": false
+            }],
+            "days": {},
+            "planned": []
+        })
+        .to_string();
+
+        let state = from_versioned_json(&contents).expect("version 5 imports");
+
+        assert_eq!(state.preferences.country, crate::models::Country::Iran);
+        assert_eq!(state.expected_income.len(), 1);
+        assert_eq!(state.expected_income[0].id, "next-payday");
+        assert_eq!(state.expected_income[0].amount.hundredths(), 12500);
     }
 }

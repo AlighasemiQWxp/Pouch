@@ -1,6 +1,6 @@
 # Pouch architecture
 
-Pouch is an Android app with Flutter presentation and a Rust application core. The components run on the device and communicate through a typed Flutter Rust Bridge.
+Pouch currently targets Android, with Flutter presentation and a Rust application core. The components run on the device and communicate through a typed Flutter Rust Bridge. The feature screens and Rust domain core are shared; future desktop support can use the same app and core with a host adapter for platform services.
 
 ```mermaid
 flowchart LR
@@ -25,6 +25,8 @@ PouchBridge is the app-facing Dart boundary for Rust commands and Android platfo
 
 MainActivity supplies the private app-data directory and saved JSON candidates to the Rust core. It also owns Android file selection for backup and restore, external URL opening, and native PDF printing. Pouch does not depend on a hosted account or backend service.
 
+Platform services stay behind the host adapter. Country defaults, date and calendar rules, income scheduling, budget calculations, report generation, and state validation are implemented in shared Flutter or Rust code without Android-specific assumptions.
+
 ### Rust core
 
 PouchCore exposes the application operations used by Flutter. CoreModules owns the validated state, revision, storage boundary, and single-step undo state. It constructs focused feature services with explicit dependencies.
@@ -43,7 +45,9 @@ At startup, Rust first checks the binary store. If no valid state is present, it
 
 Rust owns JSON backup parsing, schema validation, and conversion to app state. Flutter owns the backup screens and confirmation flow. Android owns the system file picker and print window. Reports are calculated in Rust and rendered for printing by the platform adapter.
 
-Preferences own the selected language, currency, calendar, and week start. English and Persian strings live in Flutter localization files. Language controls text direction; calendar selection controls date interpretation.
+Preferences own the selected country, language, currency, calendar, and week start. Country applies regional defaults for currency, calendar, and week start. Users can still adjust the calendar and week start, and the existing Persian-language behavior continues to select the Jalali calendar when Persian is first selected. English and Persian strings live in Flutter localization files. Language controls text direction; calendar selection controls date interpretation.
+
+Expected income is stored separately from recorded income. It appears in the income calendar and can be edited, removed, or marked received. Budget, savings, and reports use recorded income only, so forecasts do not fund spending before the user confirms receipt.
 
 ## Source map
 

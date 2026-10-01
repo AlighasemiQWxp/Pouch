@@ -11,6 +11,8 @@ The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp)
 ## Features
 
 - English and Persian interfaces, with right-to-left Persian layouts and Gregorian or Jalali calendars
+- Country-based currency, calendar, and week-start defaults, with manual calendar and week-start choices
+- Recorded income and future expected income, kept separate until it is marked received
 - Income calendar, monthly budget plans, recurring expenses, and savings commitments
 - Daily spending recommendations with carry-forward balances
 - Planned expenses that reserve money until paid

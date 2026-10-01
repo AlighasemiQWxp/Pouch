@@ -86,6 +86,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DaySnapshot dco_decode_day_snapshot(dynamic raw);
 
   @protected
+  ExpectedIncomeSnapshot dco_decode_expected_income_snapshot(dynamic raw);
+
+  @protected
   GoalForecastSnapshot dco_decode_goal_forecast_snapshot(dynamic raw);
 
   @protected
@@ -113,6 +116,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<DaySnapshot> dco_decode_list_day_snapshot(dynamic raw);
+
+  @protected
+  List<ExpectedIncomeSnapshot> dco_decode_list_expected_income_snapshot(
+    dynamic raw,
+  );
 
   @protected
   List<GoalForecastSnapshot> dco_decode_list_goal_forecast_snapshot(
@@ -251,6 +259,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DaySnapshot sse_decode_day_snapshot(SseDeserializer deserializer);
 
   @protected
+  ExpectedIncomeSnapshot sse_decode_expected_income_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   GoalForecastSnapshot sse_decode_goal_forecast_snapshot(
     SseDeserializer deserializer,
   );
@@ -284,6 +297,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<DaySnapshot> sse_decode_list_day_snapshot(SseDeserializer deserializer);
+
+  @protected
+  List<ExpectedIncomeSnapshot> sse_decode_list_expected_income_snapshot(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<GoalForecastSnapshot> sse_decode_list_goal_forecast_snapshot(
@@ -450,6 +468,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_day_snapshot(DaySnapshot self, SseSerializer serializer);
 
   @protected
+  void sse_encode_expected_income_snapshot(
+    ExpectedIncomeSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_goal_forecast_snapshot(
     GoalForecastSnapshot self,
     SseSerializer serializer,
@@ -491,6 +515,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_day_snapshot(
     List<DaySnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_expected_income_snapshot(
+    List<ExpectedIncomeSnapshot> self,
     SseSerializer serializer,
   );
 

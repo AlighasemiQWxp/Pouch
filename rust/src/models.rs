@@ -91,9 +91,24 @@ pub enum WeekStart {
     Saturday,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Country {
+    Iran,
+    Canada,
+    UnitedStates,
+    UnitedKingdom,
+    Germany,
+    Australia,
+    NewZealand,
+    #[default]
+    Custom,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Preferences {
+    pub country: Country,
     pub currency: Currency,
     pub language: Language,
     pub calendar: Calendar,
@@ -103,10 +118,11 @@ pub struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
+            country: Country::Iran,
             currency: Currency::Toman,
             language: Language::English,
-            calendar: Calendar::Gregorian,
-            week_start: WeekStart::Monday,
+            calendar: Calendar::Jalali,
+            week_start: WeekStart::Saturday,
         }
     }
 }
@@ -148,6 +164,14 @@ pub struct BudgetPlan {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeEntry {
+    pub id: String,
+    pub date: Date,
+    pub amount: Money,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpectedIncomeEntry {
     pub id: String,
     pub date: Date,
     pub amount: Money,
@@ -220,20 +244,23 @@ pub struct AppState {
     pub start_date: Date,
     pub preferences: Preferences,
     pub income: Vec<IncomeEntry>,
+    pub expected_income: Vec<ExpectedIncomeEntry>,
     pub plans: Vec<BudgetPlan>,
     pub days: BTreeMap<Date, DailyRecord>,
     pub planned: Vec<PlannedItem>,
 }
 
 impl AppState {
-    pub const CURRENT_SCHEMA_VERSION: u16 = 1;
+    pub const CURRENT_SCHEMA_VERSION: u16 = 2;
 
     pub fn fresh(start_date: Date) -> Self {
+        let preferences = Preferences::default();
         Self {
             schema_version: Self::CURRENT_SCHEMA_VERSION,
             start_date,
-            preferences: Preferences::default(),
+            preferences: preferences.clone(),
             income: Vec::new(),
+            expected_income: Vec::new(),
             plans: vec![BudgetPlan {
                 effective: start_date,
                 fallback_salary: None,
@@ -241,7 +268,7 @@ impl AppState {
                 expenses: Vec::new(),
                 monthly_savings: Money::default(),
                 payday: 1,
-                calendar: Calendar::Gregorian,
+                calendar: preferences.calendar,
                 legacy: false,
             }],
             days: BTreeMap::new(),
@@ -255,6 +282,7 @@ impl AppState {
             || self.plans.len() > 1000
             || self.planned.len() > 100_000
             || self.income.len() > 10_000
+            || self.expected_income.len() > 10_000
             || self.plans[0].effective != self.start_date
         {
             return Err(PouchError::InvalidState);
@@ -314,12 +342,32 @@ impl AppState {
             return Err(PouchError::InvalidState);
         }
         let mut income_ids = std::collections::BTreeSet::new();
+        let mut income_dates = std::collections::BTreeSet::new();
         for income in &self.income {
             income.date.to_naive_date()?;
             if income.date < self.start_date
                 || income.date > today
                 || income.id.trim().is_empty()
                 || !income_ids.insert(income.id.as_str())
+                || !income_dates.insert(income.date)
+                || !validate_money(income.amount, true)
+            {
+                return Err(PouchError::InvalidState);
+            }
+        }
+        if self
+            .expected_income
+            .windows(2)
+            .any(|entries| entries[0].date >= entries[1].date)
+        {
+            return Err(PouchError::InvalidState);
+        }
+        for income in &self.expected_income {
+            income.date.to_naive_date()?;
+            if income.date < self.start_date
+                || income.id.trim().is_empty()
+                || !income_ids.insert(income.id.as_str())
+                || !income_dates.insert(income.date)
                 || !validate_money(income.amount, true)
             {
                 return Err(PouchError::InvalidState);

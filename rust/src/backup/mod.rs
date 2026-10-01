@@ -30,13 +30,19 @@ pub fn export_json(state: &AppState) -> PouchResult<String> {
         );
     }
     let document = json!({
-        "version": 4,
+        "version": 5,
         "startDate": state.start_date.iso()?,
+        "country": country_name(state.preferences.country),
         "currency": currency_name(state.preferences.currency),
         "language": language_name(state.preferences.language),
         "calendar": calendar_name(state.preferences.calendar),
         "weekStart": week_start_number(state.preferences.week_start),
         "income": state.income.iter().map(|entry| Ok(json!({
+            "id": entry.id,
+            "date": entry.date.iso()?,
+            "amount": entry.amount.hundredths(),
+        }))).collect::<PouchResult<Vec<Value>>>()?,
+        "expectedIncome": state.expected_income.iter().map(|entry| Ok(json!({
             "id": entry.id,
             "date": entry.date.iso()?,
             "amount": entry.amount.hundredths(),
@@ -88,6 +94,19 @@ fn currency_name(value: Currency) -> &'static str {
         Currency::Gbp => "GBP",
         Currency::Aud => "AUD",
         Currency::Nzd => "NZD",
+    }
+}
+
+fn country_name(value: Country) -> &'static str {
+    match value {
+        Country::Iran => "iran",
+        Country::Canada => "canada",
+        Country::UnitedStates => "united_states",
+        Country::UnitedKingdom => "united_kingdom",
+        Country::Germany => "germany",
+        Country::Australia => "australia",
+        Country::NewZealand => "new_zealand",
+        Country::Custom => "custom",
     }
 }
 
