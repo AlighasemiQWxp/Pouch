@@ -276,6 +276,13 @@ impl AppState {
         }
     }
 
+    pub(crate) fn include_record_date(&mut self, date: Date) {
+        if date < self.start_date {
+            self.start_date = date;
+            self.plans[0].effective = date;
+        }
+    }
+
     pub fn validate(&self) -> PouchResult<()> {
         if self.schema_version != Self::CURRENT_SCHEMA_VERSION
             || self.plans.is_empty()

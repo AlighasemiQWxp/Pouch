@@ -67,7 +67,10 @@ class AboutScreen extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Text(label, style: TextStyle(color: context.pouchPalette.muted)),
+          child: Text(
+            label,
+            style: TextStyle(color: context.pouchPalette.muted),
+          ),
         ),
         Text(value, style: TextStyle(fontWeight: FontWeight.w700)),
       ],

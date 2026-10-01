@@ -104,7 +104,7 @@ class _TodayScreenState extends State<TodayScreen> {
 
   Widget _buildDateBar(BuildContext context) {
     final strings = widget.strings;
-    final startDate = DateTime.parse(widget.snapshot.startDate);
+    final firstDate = DateTime.parse(firstPouchRecordDate);
     final selected = DateTime.parse(widget.selectedDate);
     final dateLabel = FutureBuilder<String>(
       future: _formatDate(widget.selectedDate),
@@ -137,7 +137,7 @@ class _TodayScreenState extends State<TodayScreen> {
               PouchIconButton(
                 label: strings.text('previous'),
                 icon: Icons.chevron_left_rounded,
-                onPressed: selected.isAfter(startDate)
+                onPressed: selected.isAfter(firstDate)
                     ? () => _stepDate(-1)
                     : null,
               ),
@@ -152,7 +152,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       initialDate: widget.selectedDate,
                       calendar: widget.snapshot.preferences.calendar,
                       weekStart: widget.snapshot.preferences.weekStart,
-                      firstDate: widget.snapshot.startDate,
+                      firstDate: firstPouchRecordDate,
                       lastDate: '9998-12-31',
                       highlightedDates: {
                         for (final record in widget.snapshot.days)

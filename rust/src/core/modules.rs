@@ -157,6 +157,68 @@ mod tests {
     use crate::{Date, Money, models::Category};
 
     #[test]
+    fn backdated_records_extend_history_persist_and_undo() {
+        let directory = tempfile::tempdir().expect("a temporary directory is available");
+        let today = Date::from_naive_date(Local::now().date_naive()).expect("today is supported");
+        let received = today.add_days(-5).expect("the income date is valid");
+        let spent = today.add_days(-3).expect("the purchase date is valid");
+        let mut core = CoreModules::open(directory.path(), &[]).expect("the core opens");
+
+        crate::budget::recommend(core.state(), received)
+            .expect("an earlier day can be viewed before saving a record");
+        core.apply(|state| {
+            crate::income::record(
+                state,
+                "salary".into(),
+                received,
+                Money::from_hundredths(10000)?,
+            )
+        })
+        .expect("backdated income is saved");
+        let before = crate::budget::recommend(core.state(), today).expect("today is calculated");
+        core.apply_reversible(|state| {
+            crate::purchases::add(
+                state,
+                "purchase".into(),
+                spent,
+                "Lunch".into(),
+                Money::from_hundredths(200)?,
+                Category::Food,
+            )
+        })
+        .expect("a backdated purchase is saved");
+        let after = crate::budget::recommend(core.state(), today).expect("today is recalculated");
+        assert_eq!(after.carry, before.carry - 200);
+        assert_eq!(core.state().start_date, received);
+        assert_eq!(core.state().plans[0].effective, received);
+
+        let reopened = CoreModules::open(directory.path(), &[]).expect("saved history reopens");
+        assert_eq!(reopened.state().income[0].date, received);
+        assert_eq!(reopened.state().days[&spent].purchases.len(), 1);
+        let backup = crate::backup::export_json(reopened.state()).expect("history exports");
+        crate::backup::import_json(&backup).expect("history restores");
+        assert!(core.undo().expect("the backdated purchase can be undone"));
+        assert!(!core.state().days.contains_key(&spent));
+
+        let earlier = received.add_days(-2).expect("an earlier date is valid");
+        core.apply_reversible(|state| {
+            crate::purchases::add(
+                state,
+                "earlier".into(),
+                earlier,
+                "Groceries".into(),
+                Money::from_hundredths(100)?,
+                Category::Food,
+            )
+        })
+        .expect("a purchase can extend history before the first income");
+        assert_eq!(core.state().start_date, earlier);
+        assert!(core.undo().expect("the history extension can be undone"));
+        assert_eq!(core.state().start_date, received);
+        assert_eq!(core.state().plans[0].effective, received);
+    }
+
+    #[test]
     fn reversible_changes_persist_and_undo_once() {
         let directory = tempfile::tempdir().expect("a temporary directory is available");
         let today = Date::from_naive_date(Local::now().date_naive()).expect("today is supported");

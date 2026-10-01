@@ -110,8 +110,10 @@ class PouchSectionHeading extends StatelessWidget {
       Expanded(
         child: Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(color: context.pouchPalette.ink, fontWeight: FontWeight.w700),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: context.pouchPalette.ink,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       ?trailing,

@@ -9,7 +9,6 @@ pub fn record(state: &mut AppState, id: String, date: Date, amount: Money) -> Po
     date.to_naive_date()?;
     let today = Date::from_naive_date(Local::now().date_naive())?;
     if id.trim().is_empty()
-        || date < state.start_date
         || date > today
         || amount.hundredths() == 0
         || state
@@ -23,6 +22,7 @@ pub fn record(state: &mut AppState, id: String, date: Date, amount: Money) -> Po
     {
         return Err(PouchError::InvalidEntry);
     }
+    state.include_record_date(date);
     state.income.push(IncomeEntry { id, date, amount });
     state.income.sort_by_key(|entry| entry.date);
     Ok(())
@@ -43,8 +43,7 @@ pub fn edit(state: &mut AppState, id: &str, date: Date, amount: Money) -> PouchR
     let Some(index) = state.income.iter().position(|entry| entry.id == id) else {
         return Err(PouchError::InvalidEntry);
     };
-    if date < state.start_date
-        || date > today
+    if date > today
         || amount.hundredths() == 0
         || state
             .income
@@ -55,6 +54,7 @@ pub fn edit(state: &mut AppState, id: &str, date: Date, amount: Money) -> PouchR
     {
         return Err(PouchError::InvalidEntry);
     }
+    state.include_record_date(date);
     state.income[index].date = date;
     state.income[index].amount = amount;
     state.income.sort_by_key(|entry| entry.date);
@@ -130,8 +130,7 @@ pub fn mark_expected_received(
         return Err(PouchError::InvalidEntry);
     };
     let expected = state.expected_income[index].clone();
-    if received_date < state.start_date
-        || received_date > today
+    if received_date > today
         || state
             .income
             .iter()
@@ -144,6 +143,7 @@ pub fn mark_expected_received(
     {
         return Err(PouchError::InvalidEntry);
     }
+    state.include_record_date(received_date);
     state.expected_income.remove(index);
     state.income.push(IncomeEntry {
         id: expected.id,
@@ -171,6 +171,54 @@ mod tests {
         models::{ExpectedIncomeEntry, IncomeEntry},
     };
     use chrono::Local;
+
+    #[test]
+    fn editing_and_receiving_income_can_extend_history() {
+        let today = Date::from_naive_date(Local::now().date_naive()).expect("today is valid");
+        let earlier = today.add_days(-5).expect("the earlier date is valid");
+        let mut state = AppState::fresh(today);
+        super::record(
+            &mut state,
+            "salary".into(),
+            today,
+            Money::from_hundredths(1000).expect("amount is valid"),
+        )
+        .expect("income is recorded");
+        edit(
+            &mut state,
+            "salary",
+            earlier,
+            Money::from_hundredths(1000).expect("amount is valid"),
+        )
+        .expect("income can be moved before first use");
+        assert_eq!(state.start_date, earlier);
+        state.validate().expect("edited history is valid");
+
+        schedule(
+            &mut state,
+            "expected".into(),
+            today.add_days(2).expect("the future date is valid"),
+            Money::from_hundredths(2000).expect("amount is valid"),
+        )
+        .expect("income is scheduled");
+        let received = earlier.add_days(-2).expect("the received date is valid");
+        mark_expected_received(&mut state, "expected", received)
+            .expect("expected income can be received before first use");
+        assert_eq!(state.start_date, received);
+        assert_eq!(state.plans[0].effective, received);
+        state.validate().expect("received history is valid");
+
+        assert!(
+            super::record(
+                &mut state,
+                "future".into(),
+                today.add_days(1).expect("the future date is valid"),
+                Money::from_hundredths(100).expect("amount is valid"),
+            )
+            .is_err()
+        );
+        assert_eq!(state.start_date, received);
+    }
 
     #[test]
     fn editing_income_updates_amount_and_resorts_entries() {

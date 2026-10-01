@@ -52,7 +52,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   );
   late Future<List<PouchCalendarMonth>> _salaryMonthBounds = Future.wait([
     widget.bridge.calendarMonth(
-      widget.snapshot.startDate,
+      firstPouchRecordDate,
       widget.snapshot.preferences.calendar,
       0,
     ),
@@ -100,7 +100,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       );
       _salaryMonthBounds = Future.wait([
         widget.bridge.calendarMonth(
-          widget.snapshot.startDate,
+          firstPouchRecordDate,
           widget.snapshot.preferences.calendar,
           0,
         ),
@@ -640,8 +640,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     final expected = expectedByDate[date];
                     final incomeAmount = entry?.amount ?? expected?.amount;
                     final selected = date == _incomeDate;
-                    final enabled =
-                        date.compareTo(widget.snapshot.startDate) >= 0;
+                    final enabled = date.compareTo(firstPouchRecordDate) >= 0;
                     return InkWell(
                       onTap: enabled
                           ? () => _selectIncomeDate(
@@ -1132,7 +1131,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           : income.date,
       calendar: widget.snapshot.preferences.calendar,
       weekStart: widget.snapshot.preferences.weekStart,
-      firstDate: widget.snapshot.startDate,
+      firstDate: firstPouchRecordDate,
       lastDate: widget.today,
     );
     if (receivedDate == null) return;
@@ -1156,7 +1155,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       initialDate: _incomeDate,
       calendar: widget.snapshot.preferences.calendar,
       weekStart: widget.snapshot.preferences.weekStart,
-      firstDate: widget.snapshot.startDate,
+      firstDate: firstPouchRecordDate,
       lastDate: _lastIncomeDate,
     );
     if (picked != null) {

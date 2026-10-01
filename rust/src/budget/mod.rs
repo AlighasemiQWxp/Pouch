@@ -277,8 +277,8 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
     let plan = &state.plans[period.plan_index];
     let daily = allowance(state, date)?;
     let carry = checked_total(
-        base_between(state, state.start_date, date)?,
-        -spent(state, state.start_date, date)?,
+        base_between(state, state.start_date.min(date), date)?,
+        -spent(state, state.start_date.min(date), date)?,
     )?;
     let day = state.days.get(&date);
     let spent_today = day

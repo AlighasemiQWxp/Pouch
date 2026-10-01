@@ -13,7 +13,8 @@ pub fn add(
     amount: Money,
     category: Category,
 ) -> PouchResult<()> {
-    validate_new_purchase(state, &id, date, &description, amount)?;
+    validate_new_purchase(&id, date, &description, amount)?;
+    state.include_record_date(date);
     let day = state.days.entry(date).or_default();
     if day.purchases.iter().any(|purchase| purchase.id == id) {
         return Err(PouchError::InvalidEntry);
@@ -36,7 +37,7 @@ pub fn edit(
     amount: Money,
     category: Category,
 ) -> PouchResult<()> {
-    validate_new_purchase(state, id, date, &description, amount)?;
+    validate_new_purchase(id, date, &description, amount)?;
     let purchase = state
         .days
         .get_mut(&date)
@@ -84,7 +85,6 @@ pub fn set_daily_override(
 }
 
 fn validate_new_purchase(
-    state: &AppState,
     id: &str,
     date: Date,
     description: &str,
@@ -93,7 +93,6 @@ fn validate_new_purchase(
     let today = Date::from_naive_date(Local::now().date_naive())?;
     date.to_naive_date()?;
     if id.trim().is_empty()
-        || date < state.start_date
         || date > today
         || description.trim().is_empty()
         || description.encode_utf16().count() > 120

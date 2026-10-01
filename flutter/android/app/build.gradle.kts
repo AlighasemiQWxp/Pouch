@@ -1,7 +1,27 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val signingProperties = Properties()
+val signingPropertiesPath = System.getenv("POUCH_SIGNING_PROPERTIES")
+if (!signingPropertiesPath.isNullOrBlank()) {
+    val signingPropertiesFile = file(signingPropertiesPath)
+    require(signingPropertiesFile.isFile) {
+        "POUCH_SIGNING_PROPERTIES must point to an existing private properties file."
+    }
+    signingPropertiesFile.inputStream().use { signingProperties.load(it) }
+    for (property in listOf("storeFile", "storePassword", "keyAlias", "keyPassword")) {
+        require(!signingProperties.getProperty(property).isNullOrBlank()) {
+            "The private signing properties file is missing $property."
+        }
+    }
+    require(file(signingProperties.getProperty("storeFile")).isFile) {
+        "The release keystore file does not exist."
+    }
 }
 
 android {
@@ -29,11 +49,20 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            if (!signingPropertiesPath.isNullOrBlank()) {
+                storeFile = file(signingProperties.getProperty("storeFile"))
+                storePassword = signingProperties.getProperty("storePassword")
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
@@ -46,4 +75,12 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+tasks.matching { it.name == "validateSigningRelease" }.configureEach {
+    doFirst {
+        require(!signingPropertiesPath.isNullOrBlank()) {
+            "Set POUCH_SIGNING_PROPERTIES to your private signing properties file before building a release."
+        }
+    }
 }

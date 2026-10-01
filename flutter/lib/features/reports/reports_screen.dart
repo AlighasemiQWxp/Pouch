@@ -467,6 +467,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     void Function(String value) apply,
     String initial,
   ) async {
+    final selectedDates = await _calendarSelection();
+    if (!mounted) return;
     final picked = await showPouchDatePicker(
       context: context,
       bridge: widget.bridge,
@@ -476,6 +478,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       weekStart: widget.snapshot.preferences.weekStart,
       firstDate: widget.snapshot.startDate,
       lastDate: widget.today,
+      selectedDates: selectedDates,
     );
     if (picked != null && mounted) {
       setState(() {
@@ -487,6 +490,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
       });
     }
   }
+
+  Future<Set<String>> _calendarSelection() async {
+    switch (_mode) {
+      case _ReportMode.range:
+        final from = DateTime.parse('${_from}T00:00:00Z');
+        final through = DateTime.parse('${_through}T00:00:00Z');
+        return _calendarDays(from, through.difference(from).inDays + 1);
+      case _ReportMode.specific:
+        return _selectedDays.toSet();
+      case _ReportMode.weekly:
+        final anchor = DateTime.parse('${_anchor}T00:00:00Z');
+        final weekday = anchor.weekday % 7;
+        final offset =
+            (weekday - widget.snapshot.preferences.weekStart + 7) % 7;
+        return _calendarDays(anchor.subtract(Duration(days: offset)), 7);
+      case _ReportMode.monthly:
+        final month = await widget.bridge.calendarMonth(
+          _anchor,
+          widget.snapshot.preferences.calendar,
+          0,
+        );
+        return _calendarDays(
+          DateTime.parse('${month.startDate}T00:00:00Z'),
+          month.dayCount,
+        );
+    }
+  }
+
+  Set<String> _calendarDays(DateTime start, int count) => {
+    for (var day = 0; day < count; day++)
+      start.add(Duration(days: day)).toIso8601String().substring(0, 10),
+  };
 
   Future<void> _print(PouchReport report) async {
     setState(() => _printing = true);

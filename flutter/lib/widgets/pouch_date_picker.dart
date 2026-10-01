@@ -7,6 +7,9 @@ import '../core/pouch_formatters.dart';
 import '../core/pouch_models.dart';
 import '../core/pouch_theme.dart';
 
+// Keep both calendars and the preceding budget cycle within the core's 1900 limit.
+const firstPouchRecordDate = '1900-03-01';
+
 Future<String?> showPouchDatePicker({
   required BuildContext context,
   required PouchBridge bridge,
@@ -17,6 +20,7 @@ Future<String?> showPouchDatePicker({
   required String firstDate,
   required String lastDate,
   Set<String> highlightedDates = const {},
+  Set<String>? selectedDates,
 }) => showDialog<String>(
   context: context,
   builder: (context) => _PouchDateDialog(
@@ -28,6 +32,7 @@ Future<String?> showPouchDatePicker({
     firstDate: firstDate,
     lastDate: lastDate,
     highlightedDates: highlightedDates,
+    selectedDates: selectedDates,
   ),
 );
 
@@ -83,6 +88,7 @@ class _PouchDateDialog extends StatefulWidget {
     required this.firstDate,
     required this.lastDate,
     required this.highlightedDates,
+    required this.selectedDates,
   });
 
   final PouchBridge bridge;
@@ -93,6 +99,7 @@ class _PouchDateDialog extends StatefulWidget {
   final String firstDate;
   final String lastDate;
   final Set<String> highlightedDates;
+  final Set<String>? selectedDates;
 
   @override
   State<_PouchDateDialog> createState() => _PouchDateDialogState();
@@ -216,12 +223,10 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
                   itemBuilder: (context, index) {
                     final day = index - firstOffset + 1;
                     if (day < 1) return const SizedBox.shrink();
-                    final isSelected = _sameDate(
-                      widget.initialDate,
-                      month,
-                      day,
-                    );
                     final iso = _dayIso(month, day);
+                    final isSelected =
+                        widget.selectedDates?.contains(iso) ??
+                        _sameDate(widget.initialDate, month, day);
                     final isHighlighted = widget.highlightedDates.contains(iso);
                     final enabled =
                         iso.compareTo(widget.firstDate) >= 0 &&
