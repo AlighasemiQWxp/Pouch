@@ -26,6 +26,14 @@ pub fn from_versioned_json(contents: &str) -> PouchResult<AppState> {
         .as_i64()
         .ok_or(PouchError::InvalidBackup)?;
     match version {
+        6 => {
+            let mut state = from_v5(&source)?;
+            state.economic_assumptions =
+                serde_json::from_value(field(&source, "economicAssumptions")?.clone())
+                    .map_err(|_| PouchError::InvalidBackup)?;
+            state.validate()?;
+            Ok(state)
+        }
         5 => from_v5(&source),
         4 => from_v4(&source),
         3 => {
@@ -166,6 +174,7 @@ fn from_document(source: &Value, includes_regional_data: bool) -> PouchResult<Ap
         plans: Vec::new(),
         days: BTreeMap::new(),
         planned: Vec::new(),
+        economic_assumptions: BTreeMap::new(),
     };
 
     for entry in array(source, "income")? {

@@ -52,6 +52,24 @@ struct PreferencesV1 {
     week_start: WeekStart,
 }
 
+#[derive(Deserialize, Serialize)]
+struct StorageEnvelopeV2 {
+    schema_version: u16,
+    state: AppStateV2,
+}
+
+#[derive(Deserialize, Serialize)]
+struct AppStateV2 {
+    schema_version: u16,
+    start_date: Date,
+    preferences: Preferences,
+    income: Vec<IncomeEntry>,
+    expected_income: Vec<crate::models::ExpectedIncomeEntry>,
+    plans: Vec<BudgetPlan>,
+    days: std::collections::BTreeMap<Date, DailyRecord>,
+    planned: Vec<PlannedItem>,
+}
+
 pub struct LoadedState {
     pub state: AppState,
     pub recovered: bool,
@@ -218,6 +236,10 @@ fn decode(bytes: &[u8]) -> PouchResult<AppState> {
             postcard::from_bytes::<StorageEnvelopeV1>(payload)
                 .map_err(|_| PouchError::CorruptStorage)?,
         )?,
+        2 => migrate_v2(
+            postcard::from_bytes::<StorageEnvelopeV2>(payload)
+                .map_err(|_| PouchError::CorruptStorage)?,
+        )?,
         version if version == AppState::CURRENT_SCHEMA_VERSION => {
             let envelope: StorageEnvelope =
                 postcard::from_bytes(payload).map_err(|_| PouchError::CorruptStorage)?;
@@ -255,6 +277,25 @@ fn migrate_v1(envelope: StorageEnvelopeV1) -> PouchResult<AppState> {
         plans: old.plans,
         days: old.days,
         planned: old.planned,
+        economic_assumptions: std::collections::BTreeMap::new(),
+    })
+}
+
+fn migrate_v2(envelope: StorageEnvelopeV2) -> PouchResult<AppState> {
+    if envelope.schema_version != 2 || envelope.state.schema_version != 2 {
+        return Err(PouchError::CorruptStorage);
+    }
+    let old = envelope.state;
+    Ok(AppState {
+        schema_version: AppState::CURRENT_SCHEMA_VERSION,
+        start_date: old.start_date,
+        preferences: old.preferences,
+        income: old.income,
+        expected_income: old.expected_income,
+        plans: old.plans,
+        days: old.days,
+        planned: old.planned,
+        economic_assumptions: std::collections::BTreeMap::new(),
     })
 }
 
@@ -444,5 +485,48 @@ mod tests {
             .expect("the original primary should still load")
             .expect("the original primary should remain present");
         assert_eq!(loaded.state.start_date, first_date);
+    }
+    #[test]
+    fn version_two_migration_preserves_every_existing_field() {
+        let mut expected = AppState::fresh(Date::parse_iso("2024-01-01").expect("date"));
+        expected.preferences.country = Country::Iran;
+        expected.preferences.currency = Currency::Toman;
+        expected.income.push(IncomeEntry {
+            id: "received".into(),
+            date: expected.start_date,
+            amount: Money::from_hundredths(12000).expect("amount"),
+        });
+        expected
+            .expected_income
+            .push(crate::models::ExpectedIncomeEntry {
+                id: "expected".into(),
+                date: expected.start_date.add_days(50).expect("date"),
+                amount: Money::from_hundredths(15000).expect("amount"),
+            });
+        expected
+            .days
+            .insert(expected.start_date, crate::models::DailyRecord::default());
+        let old = super::AppStateV2 {
+            schema_version: 2,
+            start_date: expected.start_date,
+            preferences: expected.preferences.clone(),
+            income: expected.income.clone(),
+            expected_income: expected.expected_income.clone(),
+            plans: expected.plans.clone(),
+            days: expected.days.clone(),
+            planned: expected.planned.clone(),
+        };
+        let payload = postcard::to_allocvec(&super::StorageEnvelopeV2 {
+            schema_version: 2,
+            state: old,
+        })
+        .expect("legacy payload");
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(MAGIC);
+        bytes.extend_from_slice(&FILE_FORMAT_VERSION.to_le_bytes());
+        bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&crc32fast::hash(&payload).to_le_bytes());
+        bytes.extend_from_slice(&payload);
+        assert_eq!(decode(&bytes).expect("migrated"), expected);
     }
 }

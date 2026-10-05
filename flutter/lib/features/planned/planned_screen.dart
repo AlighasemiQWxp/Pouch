@@ -126,46 +126,6 @@ class _PlannedScreenState extends State<PlannedScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        FutureBuilder<List<PouchGoalForecast>>(
-          future: widget.bridge.goalForecast(widget.today),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return PouchCard(
-                child: PouchInlineError(strings.text('invalidAmount')),
-              );
-            }
-            final goals = snapshot.data ?? const [];
-            if (goals.isEmpty) return const SizedBox.shrink();
-            return PouchCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  PouchSectionHeading(title: strings.text('savingsGoalType')),
-                  const SizedBox(height: 6),
-                  Text(
-                    strings.text('goalAdvanced'),
-                    style: TextStyle(
-                      color: context.pouchPalette.muted,
-                      fontSize: 12,
-                      height: 1.55,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  for (final goal in goals)
-                    _GoalForecastTile(
-                      goal: goal,
-                      item: widget.snapshot.planned.firstWhere(
-                        (item) => item.id == goal.id,
-                      ),
-                      strings: strings,
-                      currency: widget.snapshot.preferences.currency,
-                    ),
-                ],
-              ),
-            );
-          },
-        ),
       ],
     );
   }
@@ -279,6 +239,29 @@ class _PlannedTile extends StatelessWidget {
             ),
           ],
         ),
+        if (pending)
+          FutureBuilder<PouchFinancialForecast>(
+            future: bridge.financialForecast(today, item.id),
+            builder: (context, value) {
+              if (value.connectionState != ConnectionState.done ||
+                  !value.hasData) {
+                return const SizedBox.shrink();
+              }
+              return Text(
+                strings.text('planAllocated', {
+                  'amount': formatMoney(
+                    value.data!.allocated,
+                    currency,
+                    strings,
+                  ),
+                }),
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  fontSize: 11,
+                ),
+              );
+            },
+          ),
         if (!pending && item.paidDate != null)
           FutureBuilder<String>(
             future: formatPouchDate(bridge, item.paidDate!, calendar, strings),
@@ -389,85 +372,6 @@ class _PlannedTile extends StatelessWidget {
         purchaseId: _newId(),
         paidDate: values.date,
         amount: values.amount,
-      ),
-    );
-  }
-}
-
-class _GoalForecastTile extends StatelessWidget {
-  const _GoalForecastTile({
-    required this.goal,
-    required this.item,
-    required this.strings,
-    required this.currency,
-  });
-
-  final PouchGoalForecast goal;
-  final PouchPlannedItem item;
-  final AppStrings strings;
-  final String currency;
-
-  @override
-  Widget build(BuildContext context) {
-    var estimate = strings.text('goalNoFunding');
-    if (goal.completionDays == 0) {
-      estimate = strings.text('goalFunded');
-    } else if (goal.completionDays != null) {
-      estimate = strings.text('goalCompletionDays', {
-        'days': localizeDigits('${goal.completionDays}', strings.language),
-      });
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.description,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              Text('${localizeDigits('${goal.percent}', strings.language)}%'),
-            ],
-          ),
-          const SizedBox(height: 7),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: goal.percent / 100,
-              minHeight: 7,
-              color: context.pouchPalette.goldBright,
-              backgroundColor: context.pouchPalette.border,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            strings.text('goalAllocated', {
-              'saved': formatMoney(goal.projected, currency, strings),
-              'target': formatMoney(item.amount, currency, strings),
-            }),
-          ),
-          const SizedBox(height: 4),
-          Text(estimate),
-          if (goal.dailyReduction > 0) ...[
-            const SizedBox(height: 4),
-            Text(
-              strings.text('goalDailyReduction', {
-                'amount': formatMoney(goal.dailyReduction, currency, strings),
-              }),
-            ),
-          ],
-          if (!goal.onTrack && goal.completionDays != 0) ...[
-            const SizedBox(height: 4),
-            Text(
-              strings.text('goalBehind'),
-              style: TextStyle(color: context.pouchPalette.muted, fontSize: 12),
-            ),
-          ],
-        ],
       ),
     );
   }

@@ -13,6 +13,11 @@ dependencies:
     sdk: flutter
   flutter_rust_bridge: 2.13.0
   intl: ^0.20.3
+  file_selector: ^1.1.0
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.2
+  pdf: ^3.12.0
+  printing: ^5.15.1
   pouch_core:
     path: rust_builder
 
@@ -25,5 +30,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/pouch-icon.png
+    - assets/fonts/Amiri-Regular.ttf
+    - assets/fonts/Amiri-Bold.ttf
+    - assets/fonts/OFL.txt
     - assets/l10n/strings_en.json
     - assets/l10n/strings_fa.json

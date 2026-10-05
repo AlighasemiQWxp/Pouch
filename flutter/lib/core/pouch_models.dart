@@ -316,6 +316,76 @@ class PouchBudgetSummary {
   );
 }
 
+class PouchFinancialForecast {
+  const PouchFinancialForecast({
+    required this.controllableSpending,
+    required this.essentialExpenses,
+    required this.configuredSavings,
+    required this.extraDays,
+    required this.fasterDays,
+    required this.contribution,
+    required this.monthlyIncome,
+    required this.dailyAllowance,
+    required this.requiredIncome,
+    required this.dailyLimit,
+    required this.monthlySaving,
+    required this.incomeGap,
+    required this.spendingReduction,
+    required this.allocated,
+    required this.remaining,
+    required this.completionDays,
+    required this.completionDate,
+    required this.onTrack,
+    required this.overdue,
+    required this.cycleDays,
+  });
+
+  final int controllableSpending;
+  final int essentialExpenses;
+  final int configuredSavings;
+  final int? extraDays;
+  final int? fasterDays;
+  final int monthlyIncome;
+  final int contribution;
+  final int dailyAllowance;
+  final int? requiredIncome;
+  final int dailyLimit;
+  final int? monthlySaving;
+  final int? incomeGap;
+  final int spendingReduction;
+  final int allocated;
+  final int remaining;
+  final int? completionDays;
+  final String? completionDate;
+  final bool onTrack;
+  final bool overdue;
+  final int cycleDays;
+
+  factory PouchFinancialForecast.fromBridge(dynamic value) =>
+      PouchFinancialForecast(
+        controllableSpending: value.controllableSpending as int,
+        essentialExpenses: value.essentialExpenses as int,
+        configuredSavings: value.configuredSavings as int,
+        extraDays: value.extraDays as int?,
+        fasterDays: value.fasterDays as int?,
+        contribution: value.contribution as int,
+        monthlyIncome: value.monthlyIncome as int,
+        dailyAllowance: value.dailyAllowance as int,
+        requiredIncome: value.requiredIncome as int?,
+        dailyLimit: value.dailyLimit as int,
+        monthlySaving: value.monthlySaving as int?,
+        incomeGap: value.incomeGap as int?,
+        spendingReduction: value.spendingReduction as int,
+        allocated: value.allocated as int,
+        remaining: value.remaining as int,
+        completionDays: value.completionDays as int?,
+        completionDate: value.completionDate as String?,
+        onTrack: value.onTrack as bool,
+        overdue: value.overdue as bool,
+        cycleDays: value.cycleDays as int,
+      );
+}
+
 class PouchGoalForecast {
   const PouchGoalForecast({
     required this.id,
@@ -460,4 +530,100 @@ class PouchReport {
     total: value.total as int,
     reserved: value.reserved as int,
   );
+}
+
+class PouchEconomicCountry {
+  const PouchEconomicCountry(
+    this.code,
+    this.labelKey,
+    this.currency,
+    this.automatic,
+  );
+  final String code;
+  final String labelKey;
+  final String currency;
+  final bool automatic;
+  factory PouchEconomicCountry.fromJson(Map<String, dynamic> value) =>
+      PouchEconomicCountry(
+        value['code'] as String,
+        value['labelKey'] as String,
+        value['currency'] as String,
+        value['automatic'] as bool,
+      );
+}
+
+class PouchEconomicObservation {
+  const PouchEconomicObservation(
+    this.indicator,
+    this.value,
+    this.unit,
+    this.period,
+    this.released,
+  );
+  final String indicator;
+  final double value;
+  final String unit;
+  final String period;
+  final String released;
+  factory PouchEconomicObservation.fromJson(Map<String, dynamic> value) =>
+      PouchEconomicObservation(
+        value['indicator'] as String,
+        (value['value'] as num).toDouble(),
+        value['unit'] as String,
+        value['period'] as String,
+        value['released'] as String,
+      );
+}
+
+class PouchStandardForecast {
+  PouchStandardForecast.fromJson(Map<String, dynamic> value)
+    : country = value['country'] as String,
+      status = value['status'] as String,
+      customized = value['customized'] as bool,
+      needsRefresh = value['needsRefresh'] as bool,
+      cacheWarning = value['cacheWarning'] as bool,
+      downloaded = value['downloaded'] as String?,
+      currency = value['currency'] as String,
+      remaining = value['remaining'] as int,
+      convertedRemaining = value['convertedRemaining'] as int?,
+      convertedGoal = value['convertedGoal'] as int?,
+      requiredMonthlySaving = value['requiredMonthlySaving'] as int?,
+      requiredMonthlyIncome = value['requiredMonthlyIncome'] as int?,
+      monthlyNetIncome = value['monthlyNetIncome'] as int?,
+      monthlyEssential = value['monthlyEssential'] as int?,
+      dailySpending = value['dailySpending'] as int?,
+      monthlySaving = value['monthlySaving'] as int?,
+      completionDays = value['completionDays'] as int?,
+      completionDate = value['completionDate'] as String?,
+      exchange = value['exchange'] as Map<String, dynamic>?,
+      exchangeRateTrillionths = value['exchangeRateTrillionths'] as int?,
+      observations = (value['observations'] as List<dynamic>)
+          .map(
+            (entry) => PouchEconomicObservation.fromJson(
+              entry as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+
+  final String country;
+  final String status;
+  final bool customized;
+  final bool needsRefresh;
+  final bool cacheWarning;
+  final String? downloaded;
+  final String currency;
+  final int remaining;
+  final int? convertedRemaining;
+  final int? convertedGoal;
+  final int? requiredMonthlySaving;
+  final int? requiredMonthlyIncome;
+  final int? monthlyNetIncome;
+  final int? monthlyEssential;
+  final int? dailySpending;
+  final int? monthlySaving;
+  final int? completionDays;
+  final String? completionDate;
+  final Map<String, dynamic>? exchange;
+  final int? exchangeRateTrillionths;
+  final List<PouchEconomicObservation> observations;
 }

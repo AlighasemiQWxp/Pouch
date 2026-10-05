@@ -38,3 +38,7 @@ Thumbs.db
 # Local-only directories
 /app/
 /tests/
+
+# Local desktop packages and toolchains
+/dist/
+/.tooling/

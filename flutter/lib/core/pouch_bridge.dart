@@ -1,7 +1,11 @@
-import 'package:flutter/services.dart';
+import 'dart:typed_data';
+import 'dart:convert';
+
 import 'package:pouch/src/rust/api.dart';
+import 'package:pouch/src/rust/api.dart' as economic_api;
 
 import 'pouch_models.dart';
+import 'pouch_platform.dart';
 
 typedef PouchMutation = Future<bool> Function(Future<PouchSnapshot> Function());
 
@@ -14,53 +18,30 @@ class PouchExpenseDraft {
 }
 
 class PouchBridge {
-  static const MethodChannel _native = MethodChannel('com.daybook.app/legacy');
+  PouchBridge({PouchPlatform? platform})
+    : _platform = platform ?? PouchPlatform.create();
 
+  final PouchPlatform _platform;
   late PouchApp _session;
 
-  Future<String> loadThemeStyle() async {
-    try {
-      final value = await _native.invokeMethod<String>('getThemeStyle');
-      if (value == 'ocean' || value == 'forest') return value!;
-    } catch (_) {}
-    return 'classic';
-  }
-
-  Future<void> saveThemeStyle(String style) async {
-    await _native.invokeMethod<void>('setThemeStyle', <String, Object>{
-      'style': style,
-    });
-  }
+  bool get isDesktop => _platform.isDesktop;
+  Future<String> loadThemeStyle() => _platform.loadThemeStyle();
+  Future<void> saveThemeStyle(String style) => _platform.saveThemeStyle(style);
 
   Future<PouchSnapshot> open() async {
-    final bootstrap = await _native.invokeMapMethod<String, Object?>(
-      'getBootstrapData',
-    );
-    if (bootstrap == null) {
-      throw StateError('Pouch could not read its Android storage location.');
+    final bootstrap = await _platform.bootstrap();
+    try {
+      _session = await PouchApp.open(
+        applicationDataDirectory: bootstrap.directory,
+        legacyJsonCandidates: bootstrap.legacyJsonCandidates,
+      );
+      final raw = await _session.snapshot();
+      await _platform.markDataImportComplete();
+      return PouchSnapshot.fromBridge(raw);
+    } catch (_) {
+      await _platform.close();
+      rethrow;
     }
-    final dataDirectory = bootstrap['dataDirectory'] as String?;
-    if (dataDirectory == null || dataDirectory.isEmpty) {
-      throw StateError('Pouch could not read its Android storage location.');
-    }
-
-    final legacyJsonCandidates =
-        [
-              bootstrap['legacyPrimary'],
-              bootstrap['legacyRecovery'],
-              bootstrap['legacyOriginal'],
-            ]
-            .whereType<String>()
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .toList(growable: false);
-    _session = await PouchApp.open(
-      applicationDataDirectory: dataDirectory,
-      legacyJsonCandidates: legacyJsonCandidates,
-    );
-    final raw = await _session.snapshot();
-    await _native.invokeMethod<void>('markDataImportComplete');
-    return PouchSnapshot.fromBridge(raw);
   }
 
   Future<String> today() => _session.today();
@@ -292,6 +273,89 @@ class PouchBridge {
     return values.map(PouchGoalForecast.fromBridge).toList(growable: false);
   }
 
+  final Map<String, Future<void>> _economicDownloads = {};
+
+  Future<List<PouchEconomicCountry>> economicCountries() async {
+    final values =
+        jsonDecode(await economic_api.economicCountries()) as List<dynamic>;
+    return values
+        .map(
+          (value) =>
+              PouchEconomicCountry.fromJson(value as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<PouchStandardForecast> standardForecast(
+    String asOf,
+    String selectedId,
+    String country,
+  ) async => PouchStandardForecast.fromJson(
+    jsonDecode(
+      await _session.standardForecast(
+        asOf: asOf,
+        selectedId: selectedId,
+        country: country,
+      ),
+    ) as Map<String, dynamic>,
+  );
+
+  Future<void> refreshEconomicProfile(String country, String currency) {
+    final key = '$country:$currency';
+    final pending = _economicDownloads[key];
+    if (pending != null) return pending;
+    final future = _downloadEconomicProfile(country, currency);
+    _economicDownloads[key] = future;
+    return future;
+  }
+
+  Future<void> _downloadEconomicProfile(String country, String currency) async {
+    try {
+      final contents = await economic_api.downloadEconomicProfile(
+        country: country,
+        currency: currency,
+      );
+      await _session.cacheEconomicProfile(contents: contents);
+    } finally {
+      _economicDownloads.remove('$country:$currency');
+    }
+  }
+
+  Future<PouchSnapshot> customizeEconomicProfile({
+    required String country,
+    required String monthlyNetIncome,
+    required String monthlyEssential,
+    required String dailySpending,
+    String? exchangeRate,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.customizeEconomicProfile(
+      country: country,
+      monthlyNetIncome: monthlyNetIncome,
+      monthlyEssential: monthlyEssential,
+      dailySpending: dailySpending,
+      exchangeRate: exchangeRate,
+    ),
+  );
+
+  Future<PouchSnapshot> resetEconomicProfile(String country) async =>
+      PouchSnapshot.fromBridge(
+        await _session.resetEconomicProfile(country: country),
+      );
+
+  Future<PouchFinancialForecast> financialForecast(
+    String asOf,
+    String selectedId, {
+    bool recommended = false,
+    bool incomeRequired = false,
+  }) async => PouchFinancialForecast.fromBridge(
+    await _session.financialForecast(
+      asOf: asOf,
+      selectedId: selectedId,
+      recommended: recommended,
+      incomeRequired: incomeRequired,
+    ),
+  );
+
   Future<PouchReport> reportRange(String from, String through) async =>
       PouchReport.fromBridge(
         await _session.reportRange(from: from, through: through),
@@ -310,18 +374,19 @@ class PouchBridge {
   Future<PouchReport> reportSpecific(List<String> days) async =>
       PouchReport.fromBridge(await _session.reportSpecific(days: days));
 
-  Future<String?> pickBackup() => _native.invokeMethod<String>('pickBackup');
+  Future<String?> pickBackup() => _platform.pickBackup();
 
-  Future<bool> saveBackup(String filename, String contents) async =>
-      await _native.invokeMethod<bool>('saveBackup', {
-        'filename': filename,
-        'contents': contents,
-      }) ??
-      false;
+  Future<bool> saveBackup(String filename, String contents) =>
+      _platform.saveBackup(filename, contents);
 
   Future<void> printReport(String title, String html) =>
-      _native.invokeMethod<void>('printReport', {'title': title, 'html': html});
+      _platform.printReport(title, html);
 
-  Future<void> openExternalUrl(String url) =>
-      _native.invokeMethod<void>('openExternalUrl', {'url': url});
+  Future<bool> printPdf(String title, Uint8List bytes) =>
+      _platform.printPdf(title, bytes);
+
+  Future<bool> savePdf(String filename, Uint8List bytes) =>
+      _platform.savePdf(filename, bytes);
+
+  Future<void> openExternalUrl(String url) => _platform.openExternalUrl(url);
 }

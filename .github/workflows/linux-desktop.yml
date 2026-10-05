@@ -1,0 +1,37 @@
+name: Linux desktop build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Pouch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout Flutter 3.47.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: flutter/flutter
+          ref: d3b14c876900e553bc736ca19295fc09e3853e8e
+          path: .tooling/flutter
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev
+          echo "$GITHUB_WORKSPACE/.tooling/flutter/bin" >> "$GITHUB_PATH"
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup default 1.97.1
+      - name: Validate and package
+        run: bash ./validate-and-build-linux.sh
+      - name: Upload Linux bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pouch-linux-x64
+          path: dist/pouch-*-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14

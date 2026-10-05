@@ -5,3 +5,5 @@ analyzer:
     - build/**
     - android/**
     - rust_builder/cargokit/build_tool/**
+    - windows/**
+    - linux/**

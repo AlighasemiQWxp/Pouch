@@ -34,10 +34,16 @@ function(apply_cargokit target manifest_dir lib_name any_symbol_name)
     endif()
     set(CARGOKIT_OHOS_SDK_HOME $ENV{OHOS_SDK_HOME})
 
+    if(IS_ABSOLUTE "${manifest_dir}")
+        set(CARGOKIT_MANIFEST_DIR "${manifest_dir}")
+    else()
+        set(CARGOKIT_MANIFEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${manifest_dir}")
+    endif()
+
     set(CARGOKIT_ENV
         "CARGOKIT_CMAKE=${CMAKE_COMMAND}"
         "CARGOKIT_CONFIGURATION=$<CONFIG>"
-        "CARGOKIT_MANIFEST_DIR=${CMAKE_CURRENT_SOURCE_DIR}/${manifest_dir}"
+        "CARGOKIT_MANIFEST_DIR=${CARGOKIT_MANIFEST_DIR}"
         "CARGOKIT_TARGET_TEMP_DIR=${CARGOKIT_TEMP_DIR}"
         "CARGOKIT_OUTPUT_DIR=${CARGOKIT_OUTPUT_DIR}"
         "CARGOKIT_TARGET_PLATFORM=${CARGOKIT_TARGET_PLATFORM}"
@@ -47,6 +53,9 @@ function(apply_cargokit target manifest_dir lib_name any_symbol_name)
     )
 
     if (WIN32)
+        if(FLUTTER_ROOT)
+            list(APPEND CARGOKIT_ENV "FLUTTER_ROOT=${FLUTTER_ROOT}")
+        endif()
         set(SCRIPT_EXTENSION ".cmd")
         set(IMPORT_LIB_EXTENSION ".lib")
     elseif (CARGOKIT_TARGET_PLATFORM STREQUAL "ohos-arm64"

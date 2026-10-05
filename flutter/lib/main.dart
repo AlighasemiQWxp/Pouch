@@ -3,15 +3,16 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:pouch/src/rust/frb_generated.dart';
 
 import 'core/app_strings.dart';
 import 'core/pouch_bridge.dart';
 import 'core/pouch_models.dart';
+import 'core/pouch_runtime.dart';
 import 'core/pouch_theme.dart';
 import 'features/about/about_screen.dart';
 import 'features/budget_plan/budget_screen.dart';
 import 'features/planned/planned_screen.dart';
+import 'features/forecast/financial_forecast_screen.dart';
 import 'features/preferences/preferences_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/today/today_screen.dart';
@@ -21,7 +22,7 @@ Future<void> main() async {
   try {
     await initializeDateFormatting('en');
     await initializeDateFormatting('fa');
-    await RustLib.init();
+    await initializePouchCore();
     final bridge = PouchBridge();
     final snapshot = await bridge.open();
     final today = await bridge.today();
@@ -398,23 +399,31 @@ class _PouchApplicationState extends State<PouchApplication>
                 ),
               ),
             ),
-            for (final page in AppPage.values)
-              ListTile(
-                selected: page == _page,
-                selectedTileColor: palette.selection,
-                leading: Icon(
-                  _pageIcon(page),
-                  color: page == _page ? palette.gold : palette.muted,
-                ),
-                title: Text(_pageTitle(page)),
-                onTap: () => _selectPage(page),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-                minVerticalPadding: 12,
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  for (final page in AppPage.values)
+                    ListTile(
+                      selected: page == _page,
+                      selectedTileColor: palette.selection,
+                      leading: Icon(
+                        _pageIcon(page),
+                        color: page == _page ? palette.gold : palette.muted,
+                      ),
+                      title: Text(_pageTitle(page)),
+                      onTap: () => _selectPage(page),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                      ),
+                      minVerticalPadding: 12,
+                    ),
+                ],
               ),
-            const Spacer(),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
               child: Text(
@@ -455,6 +464,15 @@ class _PouchApplicationState extends State<PouchApplication>
           run: _run,
           undo: _undoLastChange,
         );
+      case AppPage.forecast:
+        return FinancialForecastScreen(
+          bridge: widget.bridge,
+          snapshot: _snapshot,
+          strings: _strings,
+          today: _today,
+          run: _run,
+          onOpenPlanned: () => _selectPage(AppPage.planned),
+        );
       case AppPage.reports:
         return ReportsScreen(
           bridge: widget.bridge,
@@ -490,6 +508,7 @@ class _PouchApplicationState extends State<PouchApplication>
     return _strings.text(switch (page) {
       AppPage.today => 'navToday',
       AppPage.planned => 'navPlanned',
+      AppPage.forecast => 'forecastTitle',
       AppPage.reports => 'navReports',
       AppPage.budget => 'navBudget',
       AppPage.preferences => 'navPreferences',
@@ -501,6 +520,7 @@ class _PouchApplicationState extends State<PouchApplication>
     return switch (page) {
       AppPage.today => Icons.today_rounded,
       AppPage.planned => Icons.event_note_rounded,
+      AppPage.forecast => Icons.visibility_rounded,
       AppPage.reports => Icons.insights_rounded,
       AppPage.budget => Icons.account_balance_wallet_rounded,
       AppPage.preferences => Icons.tune_rounded,
@@ -509,7 +529,7 @@ class _PouchApplicationState extends State<PouchApplication>
   }
 }
 
-enum AppPage { today, planned, reports, budget, preferences, about }
+enum AppPage { today, planned, forecast, reports, budget, preferences, about }
 
 class _PouchCoin extends StatefulWidget {
   const _PouchCoin({required this.color});

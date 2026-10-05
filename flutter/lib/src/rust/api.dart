@@ -7,7 +7,18 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_language`, `parse_planned_kind`, `parse_week_start`, `planned_kind_name`, `planned_status_name`, `report_snapshot`, `snapshot`, `week_start_number`
+// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_exchange_rate`, `parse_language`, `parse_planned_kind`, `parse_week_start`, `planned_kind_name`, `planned_status_name`, `report_snapshot`, `snapshot`, `week_start_number`
+
+Future<String> economicCountries() =>
+    RustLib.instance.api.crateApiEconomicCountries();
+
+Future<String> downloadEconomicProfile({
+  required String country,
+  required String currency,
+}) => RustLib.instance.api.crateApiDownloadEconomicProfile(
+  country: country,
+  currency: currency,
+);
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>>
 abstract class PouchApp implements RustOpaqueInterface {
@@ -21,6 +32,8 @@ abstract class PouchApp implements RustOpaqueInterface {
 
   Future<BudgetSnapshot> budgetSummary({required String date});
 
+  Future<void> cacheEconomicProfile({required String contents});
+
   Future<String> calendarDate({
     required int year,
     required int month,
@@ -32,6 +45,14 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String date,
     required String calendar,
     required int monthOffset,
+  });
+
+  Future<AppSnapshot> customizeEconomicProfile({
+    required String country,
+    required String monthlyNetIncome,
+    required String monthlyEssential,
+    required String dailySpending,
+    String? exchangeRate,
   });
 
   Future<DatePartsSnapshot> dateParts({
@@ -50,6 +71,13 @@ abstract class PouchApp implements RustOpaqueInterface {
   Future<String> exportBackup();
 
   Future<String> exportRecoveryBackup();
+
+  Future<FinancialForecastSnapshot> financialForecast({
+    required String asOf,
+    required String selectedId,
+    required bool recommended,
+    required bool incomeRequired,
+  });
 
   Future<List<GoalForecastSnapshot>> goalForecast({required String asOf});
 
@@ -113,6 +141,8 @@ abstract class PouchApp implements RustOpaqueInterface {
 
   Future<AppSnapshot> reset();
 
+  Future<AppSnapshot> resetEconomicProfile({required String country});
+
   Future<AppSnapshot> saveBudgetPlan({
     required String effective,
     String? salary,
@@ -142,6 +172,12 @@ abstract class PouchApp implements RustOpaqueInterface {
   Future<AppSnapshot> setDailyOverride({required String date, String? amount});
 
   Future<AppSnapshot> snapshot();
+
+  Future<String> standardForecast({
+    required String asOf,
+    required String selectedId,
+    required String country,
+  });
 
   Future<String> today();
 
@@ -478,6 +514,101 @@ class ExpectedIncomeSnapshot {
           id == other.id &&
           date == other.date &&
           amount == other.amount;
+}
+
+class FinancialForecastSnapshot {
+  final int controllableSpending;
+  final int essentialExpenses;
+  final int configuredSavings;
+  final int? extraDays;
+  final int? fasterDays;
+  final int contribution;
+  final int monthlyIncome;
+  final int dailyAllowance;
+  final int? requiredIncome;
+  final int dailyLimit;
+  final int? monthlySaving;
+  final int? incomeGap;
+  final int spendingReduction;
+  final int allocated;
+  final int remaining;
+  final int? completionDays;
+  final String? completionDate;
+  final bool onTrack;
+  final bool overdue;
+  final int cycleDays;
+
+  const FinancialForecastSnapshot({
+    required this.controllableSpending,
+    required this.essentialExpenses,
+    required this.configuredSavings,
+    this.extraDays,
+    this.fasterDays,
+    required this.contribution,
+    required this.monthlyIncome,
+    required this.dailyAllowance,
+    this.requiredIncome,
+    required this.dailyLimit,
+    this.monthlySaving,
+    this.incomeGap,
+    required this.spendingReduction,
+    required this.allocated,
+    required this.remaining,
+    this.completionDays,
+    this.completionDate,
+    required this.onTrack,
+    required this.overdue,
+    required this.cycleDays,
+  });
+
+  @override
+  int get hashCode =>
+      controllableSpending.hashCode ^
+      essentialExpenses.hashCode ^
+      configuredSavings.hashCode ^
+      extraDays.hashCode ^
+      fasterDays.hashCode ^
+      contribution.hashCode ^
+      monthlyIncome.hashCode ^
+      dailyAllowance.hashCode ^
+      requiredIncome.hashCode ^
+      dailyLimit.hashCode ^
+      monthlySaving.hashCode ^
+      incomeGap.hashCode ^
+      spendingReduction.hashCode ^
+      allocated.hashCode ^
+      remaining.hashCode ^
+      completionDays.hashCode ^
+      completionDate.hashCode ^
+      onTrack.hashCode ^
+      overdue.hashCode ^
+      cycleDays.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FinancialForecastSnapshot &&
+          runtimeType == other.runtimeType &&
+          controllableSpending == other.controllableSpending &&
+          essentialExpenses == other.essentialExpenses &&
+          configuredSavings == other.configuredSavings &&
+          extraDays == other.extraDays &&
+          fasterDays == other.fasterDays &&
+          contribution == other.contribution &&
+          monthlyIncome == other.monthlyIncome &&
+          dailyAllowance == other.dailyAllowance &&
+          requiredIncome == other.requiredIncome &&
+          dailyLimit == other.dailyLimit &&
+          monthlySaving == other.monthlySaving &&
+          incomeGap == other.incomeGap &&
+          spendingReduction == other.spendingReduction &&
+          allocated == other.allocated &&
+          remaining == other.remaining &&
+          completionDays == other.completionDays &&
+          completionDate == other.completionDate &&
+          onTrack == other.onTrack &&
+          overdue == other.overdue &&
+          cycleDays == other.cycleDays;
 }
 
 class GoalForecastSnapshot {

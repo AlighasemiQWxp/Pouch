@@ -3,6 +3,7 @@ use crate::{Money, PouchCore, models::*};
 #[flutter_rust_bridge::frb(opaque)]
 pub struct PouchApp {
     core: PouchCore,
+    economics: crate::economics::EconomicStore,
 }
 
 impl PouchApp {
@@ -10,9 +11,10 @@ impl PouchApp {
         application_data_directory: String,
         legacy_json_candidates: Vec<String>,
     ) -> Result<Self, String> {
+        let economics = crate::economics::EconomicStore::new(&application_data_directory);
         let core = PouchCore::open(application_data_directory, &legacy_json_candidates)
             .map_err(|error| error.to_string())?;
-        Ok(Self { core })
+        Ok(Self { core, economics })
     }
 
     pub fn snapshot(&self) -> Result<AppSnapshot, String> {
@@ -386,6 +388,139 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
+    pub fn standard_forecast(
+        &self,
+        as_of: String,
+        selected_id: String,
+        country: String,
+    ) -> Result<String, String> {
+        let cached = self.economics.read();
+        let result = crate::economics::forecast(
+            self.core.state(),
+            &cached,
+            parse_date(&as_of)?,
+            &selected_id,
+            &country,
+            currency_name(self.core.state().preferences.currency),
+        )?;
+        serde_json::to_string(&result).map_err(|_| "invalid_profile".into())
+    }
+
+    pub fn cache_economic_profile(&self, contents: String) -> Result<(), String> {
+        if contents.len() > 200_000 {
+            return Err("invalid_profile".into());
+        }
+        let download: crate::economics::Download =
+            serde_json::from_str(&contents).map_err(|_| "invalid_profile")?;
+        let iran = download.profile.country == "IR";
+        download.profile.validate().map_err(|error| {
+            if iran {
+                "iran_validation_failed".into()
+            } else {
+                error
+            }
+        })?;
+        if let Some(exchange) = &download.exchange {
+            exchange.validate().map_err(|error| {
+                if iran {
+                    "iran_validation_failed".into()
+                } else {
+                    error
+                }
+            })?;
+        }
+        self.economics.save(download).map_err(|error| {
+            if iran {
+                "iran_cache_failed".into()
+            } else {
+                error
+            }
+        })
+    }
+
+    pub fn customize_economic_profile(
+        &mut self,
+        country: String,
+        monthly_net_income: String,
+        monthly_essential: String,
+        daily_spending: String,
+        exchange_rate: Option<String>,
+    ) -> Result<AppSnapshot, String> {
+        if !crate::economics::valid_country(&country) {
+            return Err("invalid_country".into());
+        }
+        let goal_currency = currency_name(self.core.state().preferences.currency).to_owned();
+        let currency = crate::economics::country_currency(&country, &goal_currency).to_owned();
+        let exchange_rate_trillionths = exchange_rate
+            .map(|text| parse_exchange_rate(&text))
+            .transpose()?;
+        let value = crate::economics::Assumptions {
+            currency,
+            goal_currency,
+            monthly_net_income: parse_amount(&monthly_net_income)?.hundredths(),
+            monthly_essential: parse_amount(&monthly_essential)?.hundredths(),
+            daily_spending: parse_amount(&daily_spending)?.hundredths(),
+            exchange_rate_trillionths,
+        };
+        value.validate().map_err(|error| error.to_string())?;
+        self.core
+            .apply(|state| {
+                state.economic_assumptions.insert(country, value);
+                Ok(())
+            })
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn reset_economic_profile(&mut self, country: String) -> Result<AppSnapshot, String> {
+        self.core
+            .apply(|state| {
+                state.economic_assumptions.remove(&country);
+                Ok(())
+            })
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn financial_forecast(
+        &self,
+        as_of: String,
+        selected_id: String,
+        recommended: bool,
+        income_required: bool,
+    ) -> Result<FinancialForecastSnapshot, String> {
+        let forecast = crate::forecast::preview(
+            self.core.state(),
+            parse_date(&as_of)?,
+            &selected_id,
+            recommended,
+            income_required,
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(FinancialForecastSnapshot {
+            controllable_spending: forecast.controllable_spending,
+            essential_expenses: forecast.essential_expenses,
+            configured_savings: forecast.configured_savings,
+            extra_days: forecast.extra_days,
+            faster_days: forecast.faster_days,
+            monthly_income: forecast.monthly_income,
+            daily_allowance: forecast.daily_allowance,
+            required_income: forecast.required_income,
+            daily_limit: forecast.daily_limit,
+            monthly_saving: forecast.monthly_saving,
+            income_gap: forecast.income_gap,
+            spending_reduction: forecast.spending_reduction,
+            allocated: forecast.allocated,
+            remaining: forecast.remaining,
+            completion_days: forecast.completion_days,
+            completion_date: forecast.completion_date,
+            on_track: forecast.on_track,
+            overdue: forecast.overdue,
+            cycle_days: forecast.cycle_days,
+            contribution: forecast.contribution,
+        })
+    }
+
     pub fn goal_forecast(&self, as_of: String) -> Result<Vec<GoalForecastSnapshot>, String> {
         crate::goals::forecast(self.core.state(), parse_date(&as_of)?)
             .map_err(|error| error.to_string())?
@@ -443,6 +578,55 @@ impl PouchApp {
             .map_err(|error| error.to_string())?;
         report_snapshot(self.core.state(), dates)
     }
+}
+
+pub fn economic_countries() -> Result<String, String> {
+    serde_json::to_string(&crate::economics::COUNTRIES).map_err(|_| "invalid_country".into())
+}
+
+pub async fn download_economic_profile(
+    country: String,
+    currency: String,
+) -> Result<String, String> {
+    let download = crate::economics::download(&country, &currency).await?;
+    serde_json::to_string(&download).map_err(|_| "invalid_profile".into())
+}
+
+fn parse_exchange_rate(text: &str) -> Result<i64, String> {
+    let mut normalized = String::new();
+    for character in text.trim().chars() {
+        match character {
+            '۰'..='۹' => {
+                normalized.push(char::from(b'0' + (character as u32 - '۰' as u32) as u8))
+            }
+            '٠'..='٩' => {
+                normalized.push(char::from(b'0' + (character as u32 - '٠' as u32) as u8))
+            }
+            '٫' => normalized.push('.'),
+            ',' | '٬' => {}
+            _ => normalized.push(character),
+        }
+    }
+    let mut parts = normalized.split('.');
+    let whole = parts.next().ok_or("invalid_exchange_rate")?;
+    let fraction = parts.next().unwrap_or("");
+    if parts.next().is_some()
+        || whole.is_empty()
+        || fraction.len() > 12
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err("invalid_exchange_rate".into());
+    }
+    let whole: i64 = whole.parse().map_err(|_| "invalid_exchange_rate")?;
+    let fraction: i64 = format!("{fraction:0<12}")
+        .parse()
+        .map_err(|_| "invalid_exchange_rate")?;
+    whole
+        .checked_mul(1_000_000_000_000)
+        .and_then(|value| value.checked_add(fraction))
+        .filter(|value| (1..=1_000_000_000_000_000_000).contains(value))
+        .ok_or_else(|| "invalid_exchange_rate".into())
 }
 
 pub struct AppSnapshot {
@@ -536,6 +720,29 @@ pub struct BudgetSnapshot {
     pub reserved: i64,
     pub recommendation: i64,
     pub shortfall: i64,
+}
+
+pub struct FinancialForecastSnapshot {
+    pub controllable_spending: i64,
+    pub essential_expenses: i64,
+    pub configured_savings: i64,
+    pub extra_days: Option<i32>,
+    pub faster_days: Option<i32>,
+    pub contribution: i64,
+    pub monthly_income: i64,
+    pub daily_allowance: i64,
+    pub required_income: Option<i64>,
+    pub daily_limit: i64,
+    pub monthly_saving: Option<i64>,
+    pub income_gap: Option<i64>,
+    pub spending_reduction: i64,
+    pub allocated: i64,
+    pub remaining: i64,
+    pub completion_days: Option<i32>,
+    pub completion_date: Option<String>,
+    pub on_track: bool,
+    pub overdue: bool,
+    pub cycle_days: i32,
 }
 
 pub struct GoalForecastSnapshot {
@@ -922,5 +1129,24 @@ fn planned_status_name(value: PlannedStatus) -> &'static str {
     match value {
         PlannedStatus::Pending => "pending",
         PlannedStatus::Paid => "paid",
+    }
+}
+
+#[cfg(test)]
+mod economic_api_tests {
+    #[test]
+    fn exchange_assumptions_support_persian_digits_and_small_rates() {
+        assert_eq!(
+            super::parse_exchange_rate("۰٫۰۰۰۰۰۸۷۷۱۲۳۴").expect("rate"),
+            8_771_234
+        );
+        assert_eq!(
+            super::parse_exchange_rate("1.4246").expect("rate"),
+            1_424_600_000_000
+        );
+        assert!(super::parse_exchange_rate("0").is_err());
+        assert!(super::parse_exchange_rate("NaN").is_err());
+        assert!(super::parse_exchange_rate("1e3").is_err());
+        assert!(super::parse_exchange_rate("0.0000000000001").is_err());
     }
 }

@@ -30,7 +30,8 @@ pub fn export_json(state: &AppState) -> PouchResult<String> {
         );
     }
     let document = json!({
-        "version": 5,
+        "version": 6,
+        "economicAssumptions": state.economic_assumptions,
         "startDate": state.start_date.iso()?,
         "country": country_name(state.preferences.country),
         "currency": currency_name(state.preferences.currency),

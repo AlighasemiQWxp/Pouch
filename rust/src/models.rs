@@ -248,10 +248,11 @@ pub struct AppState {
     pub plans: Vec<BudgetPlan>,
     pub days: BTreeMap<Date, DailyRecord>,
     pub planned: Vec<PlannedItem>,
+    pub economic_assumptions: BTreeMap<String, crate::economics::Assumptions>,
 }
 
 impl AppState {
-    pub const CURRENT_SCHEMA_VERSION: u16 = 2;
+    pub const CURRENT_SCHEMA_VERSION: u16 = 3;
 
     pub fn fresh(start_date: Date) -> Self {
         let preferences = Preferences::default();
@@ -273,6 +274,7 @@ impl AppState {
             }],
             days: BTreeMap::new(),
             planned: Vec::new(),
+            economic_assumptions: BTreeMap::new(),
         }
     }
 
@@ -284,6 +286,7 @@ impl AppState {
     }
 
     pub fn validate(&self) -> PouchResult<()> {
+        crate::economics::validate_assumptions(&self.economic_assumptions)?;
         if self.schema_version != Self::CURRENT_SCHEMA_VERSION
             || self.plans.is_empty()
             || self.plans.len() > 1000

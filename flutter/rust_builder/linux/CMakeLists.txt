@@ -9,8 +9,11 @@ set(PROJECT_NAME "pouch_core")
 project(${PROJECT_NAME} LANGUAGES CXX)
 
 include("../cargokit/cmake/cargokit.cmake")
-apply_cargokit(${PROJECT_NAME} ../../../rust pouch_core "")
-target_link_libraries(${BINARY_NAME} PRIVATE "${${PROJECT_NAME}_cargokit_lib}")
+get_filename_component(POUCH_RUST_ROOT "${CMAKE_SOURCE_DIR}/../../rust" ABSOLUTE)
+if(NOT EXISTS "${POUCH_RUST_ROOT}/Cargo.toml")
+  message(FATAL_ERROR "Pouch Rust manifest not found: ${POUCH_RUST_ROOT}/Cargo.toml")
+endif()
+apply_cargokit(${PROJECT_NAME} "${POUCH_RUST_ROOT}" pouch_core "")
 
 # List of absolute paths to libraries that should be bundled with the plugin.
 # This list could contain prebuilt libraries, or libraries created by an

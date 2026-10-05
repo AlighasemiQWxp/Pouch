@@ -10,6 +10,9 @@ import '../../core/pouch_theme.dart';
 import '../../widgets/pouch_widgets.dart';
 import '../../widgets/pouch_date_picker.dart';
 
+import 'report_pdf.dart';
+import 'desktop_report_dialog.dart';
+
 enum _ReportMode { range, specific, weekly, monthly }
 
 class ReportsScreen extends StatefulWidget {
@@ -526,6 +529,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> _print(PouchReport report) async {
     setState(() => _printing = true);
     try {
+      if (widget.bridge.isDesktop) {
+        final bytes = await buildPouchReportPdf(
+          report: report,
+          strings: widget.strings,
+          currency: widget.snapshot.preferences.currency,
+          formatDate: (date) => formatPouchDate(
+            widget.bridge,
+            date,
+            widget.snapshot.preferences.calendar,
+            widget.strings,
+          ),
+        );
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => DesktopReportDialog(
+            bridge: widget.bridge,
+            strings: widget.strings,
+            bytes: bytes,
+          ),
+        );
+        return;
+      }
       await widget.bridge.printReport(
         widget.strings.text('reportTitle'),
         await _reportHtml(report),

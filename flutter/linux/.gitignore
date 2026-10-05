@@ -1,0 +1,5 @@
+flutter/ephemeral
+
+# Recreated by Flutter dependency resolution
+flutter/generated_plugin_registrant.*
+flutter/generated_plugins.cmake

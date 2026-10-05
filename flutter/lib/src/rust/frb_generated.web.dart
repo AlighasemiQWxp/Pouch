@@ -94,6 +94,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ExpectedIncomeSnapshot dco_decode_expected_income_snapshot(dynamic raw);
 
   @protected
+  FinancialForecastSnapshot dco_decode_financial_forecast_snapshot(dynamic raw);
+
+  @protected
   GoalForecastSnapshot dco_decode_goal_forecast_snapshot(dynamic raw);
 
   @protected
@@ -194,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_u_8(dynamic raw);
 
   @protected
+  void dco_decode_unit(dynamic raw);
+
+  @protected
   BigInt dco_decode_usize(dynamic raw);
 
   @protected
@@ -271,6 +277,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ExpectedIncomeSnapshot sse_decode_expected_income_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FinancialForecastSnapshot sse_decode_financial_forecast_snapshot(
     SseDeserializer deserializer,
   );
 
@@ -397,6 +408,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_u_8(SseDeserializer deserializer);
 
   @protected
+  void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
@@ -487,6 +501,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_expected_income_snapshot(
     ExpectedIncomeSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_financial_forecast_snapshot(
+    FinancialForecastSnapshot self,
     SseSerializer serializer,
   );
 
@@ -645,6 +665,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_unit(void self, SseSerializer serializer);
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);
