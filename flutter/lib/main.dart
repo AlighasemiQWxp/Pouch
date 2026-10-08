@@ -529,7 +529,7 @@ class _PouchApplicationState extends State<PouchApplication>
   }
 }
 
-enum AppPage { today, planned, forecast, reports, budget, preferences, about }
+enum AppPage { today, budget, planned, forecast, reports, preferences, about }
 
 class _PouchCoin extends StatefulWidget {
   const _PouchCoin({required this.color});

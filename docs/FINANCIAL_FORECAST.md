@@ -2,15 +2,22 @@
 
 Financial Forecast is a main navigation page with an eye icon, labeled **پیش‌بینی مالی** in Persian. `flutter/lib/features/forecast` owns all forecast presentation. Planned Expenses owns target creation, editing, amounts, dates, payment actions and current allocation labels. It has no completion estimates or forecast controls. When no pending positive-amount targets exist, the forecast page offers a button opening Planned Expenses.
 
-## Shared target and three sections
+## Target and progressive disclosure
 
-One selector shows pending goals and expenses in deadline/ID order. The selected name, type, amount and calendar date are visible. All three sections read the same target:
+The drawer order is Today, Budget Plan, Planned Expenses, Financial Forecast, Reports, Settings & Data, About.
 
-1. **Forecast based on your recorded data** shows funded recorded income, fixed/essential costs, recorded everyday spending (or the funded daily recommendation with no history), configured savings, affordable target contribution, completion days/date, extra days beyond the deadline and savings required by the deadline.
-2. **Pouch Recommendation** contains an Income basis dropdown. **My recorded income** keeps income fixed, preserves essential costs and previews a 10% reduction in everyday spending, rounded upward, while allocating affordable surplus. The UI explicitly asks users to consider this only when everyday needs remain covered. **Income required for the goal** keeps current everyday spending and computes the income needed for all pending deadlines and the configured savings minimum. It uses no national salary data. If any unfunded deadline has passed, no finite required income/completion is invented.
-3. **Standard Forecast** compares the selected target's remaining amount with country benchmark income and saving capacity. It shows converted remaining amount, benchmark income, achievable savings and days/date. Full target amount, deadline requirements, economic sources, units, reference periods, exchange details and assumptions are expandable.
+One selector shows pending goals and expenses in deadline/ID order. The selected name, remaining amount and calendar deadline are visible. All forecast views use the same target.
 
-Recorded and recommended sections are always visible. There is no Personal/Recommendation segmented control and no temporary spending input. Metric grids collapse to one column on narrow screens. Completion dates use DD/MM/YYYY in the selected Gregorian/Jalali calendar, with localized Persian digits and RTL.
+The initial page shows **Your current forecast**: estimated completion days/date and deadline status. Income, essential costs, everyday spending, configured savings, affordable contribution, deadline saving requirements, allocations and assumptions are inside **How this is calculated**.
+
+**Explore improvements** starts collapsed. Its selector offers:
+
+- **Spend a little less**: preserves recorded income and essential costs while previewing a 10% reduction in everyday spending, rounded upward. Users are asked to consider this only when everyday needs remain covered.
+- **Income needed to meet the deadline**: keeps current everyday spending and computes the income needed for all pending deadlines and the configured savings minimum. The required income is visible alongside completion. It uses no national salary data. If an unfunded deadline has passed, no finite required income/completion is invented.
+
+**Compare with another country** starts collapsed and initializes the Standard Forecast only while opened. It contains country selection, benchmark results, optional customization, refresh controls and expandable sources/assumptions. The country comparison evaluates the selected target's remaining amount using country benchmark income and saving capacity.
+
+Metric grids collapse to one column on narrow screens. Completion dates use DD/MM/YYYY in the selected Gregorian/Jalali calendar, with localized Persian digits and RTL. Previews do not change the financial plan; saving or resetting optional country assumptions retains the existing explicit customization behavior.
 
 ## Calculation and data ownership
 
@@ -49,9 +56,10 @@ Use `validate-and-build-windows.ps1` or `validate-and-build-linux.sh` for the co
 
 After validation, check:
 
-- Eye navigation, no duplicate forecasts in Planned Expenses, allocation labels, and empty-state navigation.
+- Drawer order, eye navigation, no duplicate forecasts in Planned Expenses, allocation labels, and empty-state navigation.
+- Initially collapsed improvements, country comparison and calculation details; completion/deadline status; remaining amount; both improvement choices; country controls after closing and reopening.
 - Expense/goal selection, long names, partially funded goals and earlier commitments. All sections must select the same target, including rapid changes while requests are pending.
-- Both Income basis options, zero/unreceived income, insufficient savings, overdue/fully funded targets and unchanged allocations across previews.
+- Both improvement choices, zero/unreceived income, insufficient savings, overdue/fully funded targets and unchanged allocations across previews.
 - Recorded/recommended completion days, date, extra days and comparison. A 10% spending reduction must be clearly optional; essential expenses stay fixed.
 - Iran refresh on the target device, failure messages, cached offline data and preserved custom overrides. Verify all other countries and currency pairs still work.
 - English/Persian, Gregorian/Jalali, narrow Android, desktop and short-window drawer scrolling.

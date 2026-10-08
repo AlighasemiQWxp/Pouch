@@ -321,7 +321,7 @@
   "reportPreviewFailed": "Could not display the PDF preview. You can still save or print the report.",
   "reportPrinted": "Report sent to the print service.",
   "forecastTitle": "Financial Forecast",
-  "forecastHowCalculated": "How this forecast works",
+  "forecastHowCalculated": "How this is calculated",
   "forecastHint": "Choose a plan to see what it takes to reach it while covering your everyday needs.",
   "forecastEmpty": "Create a planned expense or savings goal in Planned Expenses to see a forecast.",
   "forecastSelect": "Expense or savings goal",
@@ -403,8 +403,8 @@
   "standardInternationalMethod": "Income: OECD modeled net earnings for a single worker without children at the average wage. Living costs: World Bank annual household consumption divided by population, a national per-person benchmark, not a city rent quote. Income and spending may refer to different years (up to two years apart).",
   "standardRequiredHouseholdIncome": "Monthly household income needed",
   "standardHouseholdIncome": "Reported monthly household income",
-  "forecastRecorded": "Forecast based on your recorded data",
-  "forecastPageHint": "Choose one target and compare your current plan, Pouch recommendation and another country.",
+  "forecastRecorded": "Your current forecast",
+  "forecastPageHint": "Choose a target to see when you can afford it. Explore alternatives below.",
   "forecastRecordedQuestion": "When will my current plan reach this target?",
   "forecastRecommendationQuestion": "What could help me reach this target faster?",
   "forecastIncomeBasis": "Income basis",
@@ -429,5 +429,11 @@
   "standardIranHttp": "SCI returned an unsuccessful HTTP response. Try again later. Cached data and custom assumptions are preserved.",
   "standardIranBody": "The SCI response could not be downloaded completely. Cached data and custom assumptions are preserved.",
   "standardIranBodyTooLarge": "The SCI response exceeds the supported size. Cached data and custom assumptions are preserved.",
-  "standardIranCache": "The refreshed SCI data could not be stored. Previous cached data and custom assumptions are preserved."
+  "standardIranCache": "The refreshed SCI data could not be stored. Previous cached data and custom assumptions are preserved.",
+  "forecastExplore": "Explore improvements",
+  "forecastCompareCountry": "Compare with another country",
+  "forecastImprovement": "What would you like to explore?",
+  "forecastSpendLess": "Spend a little less",
+  "forecastIncomeForDeadline": "Income needed to meet the deadline",
+  "forecastFunded": "This target is fully funded."
 }

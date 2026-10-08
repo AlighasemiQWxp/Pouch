@@ -15,7 +15,7 @@ The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp)
 - Recorded income and future expected income, kept separate until it is marked received
 - Backdated income and purchases in Budget Plan and Today, including dates before first use; earlier records extend the first budget plan and carry-forward history
 - Income calendar and a simple monthly plan for savings and essential expenses
-- Dedicated Financial Forecast navigation with a shared target, recorded-data results, recommendation income basis and Standard Forecast; manual validation pending (see [Financial Forecast](docs/FINANCIAL_FORECAST.md))
+- Financial Forecast with a shared target, clear completion/deadline status, expandable improvements and country comparison; manual validation pending (see [Financial Forecast](docs/FINANCIAL_FORECAST.md))
 - Standard Forecast with automatic data retrieval for all seven named countries, deadline saving and income requirements, currency conversion, offline caching and optional local assumptions; manual validation pending (see [Economic Profiles](docs/ECONOMIC_PROFILES.md))
 - Daily spending recommendations with carry-forward balances
 - Planned expenses that reserve money until paid
@@ -52,7 +52,7 @@ If you change the Rust API, regenerate the Flutter bridge from the flutter direc
 
 ## Desktop support
 
-Windows x64 and Linux x64 runners, platform services, and manual packaging scripts are prepared. See [desktop build and acceptance instructions](docs/DESKTOP.md). Desktop compilation and runtime validation are pending; no desktop release is published. The Linux workflow runs only when manually requested and uploads an Actions artifact rather than a release.
+Windows x64 and Linux x64 runners, platform services, and manual packaging scripts are prepared. See [desktop build and acceptance instructions](docs/DESKTOP.md). Desktop compilation and runtime validation are pending; no desktop release is published. The Linux workflow runs on every push to main and on pull requests, and can also be started manually. It checks the Flutter frontend and Rust core, builds the Linux application, and uploads an Actions artifact rather than a release. Results appear in GitHub Actions and commit or pull-request checks.
 
 ## Release signing and validation
 

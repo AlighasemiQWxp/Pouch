@@ -35,6 +35,7 @@ class FinancialForecastScreen extends StatefulWidget {
 class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
   String? _selectedId;
   bool _incomeRequired = false;
+  bool _countryExpanded = false;
   Future<_ForecastView>? _recorded;
   Future<_ForecastView>? _recommended;
 
@@ -167,7 +168,17 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
                   target.description,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
-                Text(_money(target.amount)),
+                FutureBuilder<_ForecastView>(
+                  key: ObjectKey(_recorded),
+                  future: _recorded,
+                  builder: (context, result) {
+                    if (!result.hasData) return const SizedBox.shrink();
+                    return Text(
+                      '${strings.text('forecastRemaining')}: '
+                      '${_money(result.data!.value.remaining)}',
+                    );
+                  },
+                ),
                 PouchDateLabel(
                   bridge: widget.bridge,
                   strings: strings,
@@ -180,16 +191,32 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
           const SizedBox(height: 14),
           _section(false),
           const SizedBox(height: 14),
-          _section(true),
+          PouchCard(
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text(strings.text('forecastExplore')),
+              children: [_section(true)],
+            ),
+          ),
           const SizedBox(height: 14),
           PouchCard(
-            child: StandardForecastSection(
-              bridge: widget.bridge,
-              snapshot: widget.snapshot,
-              strings: strings,
-              today: widget.today,
-              selectedId: target.id,
-              run: widget.run,
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text(strings.text('forecastCompareCountry')),
+              onExpansionChanged: (expanded) {
+                setState(() => _countryExpanded = expanded);
+              },
+              children: [
+                if (_countryExpanded)
+                  StandardForecastSection(
+                    bridge: widget.bridge,
+                    snapshot: widget.snapshot,
+                    strings: strings,
+                    today: widget.today,
+                    selectedId: target.id,
+                    run: widget.run,
+                  ),
+              ],
             ),
           ),
         ],
@@ -219,17 +246,25 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
             DropdownButtonFormField<bool>(
               initialValue: _incomeRequired,
               decoration: InputDecoration(
-                labelText: strings.text('forecastIncomeBasis'),
+                labelText: strings.text('forecastImprovement'),
               ),
               isExpanded: true,
               items: [
                 DropdownMenuItem(
                   value: false,
-                  child: Text(strings.text('forecastRecordedIncome')),
+                  child: Text(
+                    strings.text('forecastSpendLess'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 DropdownMenuItem(
                   value: true,
-                  child: Text(strings.text('forecastRequiredIncomeBasis')),
+                  child: Text(
+                    strings.text('forecastIncomeForDeadline'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
               onChanged: (value) {
@@ -284,11 +319,23 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
         'date': view.date!,
       });
     }
+    final target = _targets.where((item) => item.id == _selectedId).firstOrNull;
+    var status = 'forecastNoCapacity';
+    if (value.remaining == 0) {
+      status = 'forecastFunded';
+    } else if (value.overdue) {
+      status = 'forecastOverdue';
+    } else if (value.completionDate != null && target != null) {
+      status = 'forecastBehind';
+      if (value.completionDate!.compareTo(target.date) <= 0) {
+        status = 'forecastOnTrack';
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ForecastMetricGrid(children: metrics),
-        const SizedBox(height: 8),
+        if (incomeRequired)
+          _metric('forecastIncome', _optionalMoney(value.requiredIncome)),
         ForecastMetric(
           label: strings.text('forecastCompletion'),
           value: completion,
@@ -299,15 +346,13 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
             'forecastExtraDays',
             localizeDigits('${value.extraDays}', strings.language),
           ),
-        if (!recommended || incomeRequired)
-          _metric('forecastMonthlySaving', _optionalMoney(value.monthlySaving)),
+        if (view.date != null || value.overdue) Text(strings.text(status)),
         if (recommended && value.fasterDays != null && value.fasterDays! > 0)
           Text(
             strings.text('forecastFaster', {
               'days': localizeDigits('${value.fasterDays}', strings.language),
             }),
           ),
-        if (value.overdue) Text(strings.text('forecastOverdue')),
         if (value.dailyAllowance == 0)
           Text(strings.text('forecastZeroAllowance')),
         if (recommended) Text(strings.text('forecastPreviewHint')),
@@ -317,6 +362,12 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
           tilePadding: EdgeInsets.zero,
           title: Text(strings.text('forecastHowCalculated')),
           children: [
+            ForecastMetricGrid(children: metrics),
+            if (!recommended || incomeRequired)
+              _metric(
+                'forecastMonthlySaving',
+                _optionalMoney(value.monthlySaving),
+              ),
             _metric('forecastAllocated', _money(value.allocated)),
             _metric('forecastRemaining', _money(value.remaining)),
             Text(strings.text('forecastSharedSavings')),

@@ -45,11 +45,11 @@ Rust's binary schema, validated writes, recovery and portable JSON backup format
 
 Desktop report export adds a preview with Print, Save as PDF and Close. PDF generation uses the same Rust report, localized labels, amounts and calendar formatter as Android HTML reports. Amiri fonts support offline English and Persian output. Save as PDF uses a native save dialog and remains available if preview rendering or printer discovery fails. Android continues using its native HTML print window.
 
-## Manual Linux workflow
+## GitHub Actions Linux workflow
 
-.github/workflows/linux-desktop.yml has only workflow_dispatch. It has read-only repository permissions, runs validation/build/package on Ubuntu 24.04, and uploads a GitHub Actions artifact for 14 days. It has no push, pull-request or tag triggers, and no GitHub Release upload steps. It has not been run.
+.github/workflows/linux-desktop.yml runs on every push to main and on pull requests, with workflow_dispatch retained for manual runs. It has read-only repository permissions, runs Rust and Flutter formatting checks, linting, tests, and Linux build/package on Ubuntu 24.04, and uploads a GitHub Actions artifact for 14 days. There are no path filters, so documentation-only pushes to main also create runs. Results appear in the Actions tab and commit or pull-request checks, with a green check only when all steps succeed. It has no GitHub Release upload steps.
 
-After source review, manual validation and repository synchronization, the workflow can be started explicitly from GitHub Actions. A passing build is not proof that Linux UI, dialogs or printing work; test the extracted artifact on a Linux desktop before publishing.
+After source review and manual validation, pushing to main starts the workflow automatically. It can also be started explicitly from GitHub Actions using Run workflow. A passing build is not proof that Linux UI, dialogs or printing work; test the extracted artifact on a Linux desktop before publishing.
 
 ## Acceptance checks
 
