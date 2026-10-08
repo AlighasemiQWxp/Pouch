@@ -23,6 +23,7 @@ jobs:
           repository: flutter/flutter
           ref: d3b14c876900e553bc736ca19295fc09e3853e8e
           path: .tooling/flutter
+          fetch-depth: 0
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
