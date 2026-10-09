@@ -1,6 +1,6 @@
 # Windows and Linux desktop builds
 
-Desktop support is prepared for Windows x64 and Ubuntu 24.04 x64. Compilation and desktop runtime acceptance remain pending. Android retains its existing native services and signing setup. No desktop release has been published.
+Version 2 desktop packages passed manual build and runtime validation on Windows 11 x64 and Ubuntu 26.04 x64. Android retains its native services and release signing setup. The Windows package is an unsigned portable release. Compatibility of the published Linux package with Ubuntu 24.04 or older distributions has not been verified.
 
 ## Toolchains
 
@@ -33,7 +33,7 @@ From the repository root on Linux:
 
 Scripts check Rust formatting, Clippy and tests, resolve the locked Flutter dependencies, check Dart formatting, run Flutter analysis and tests, then build and package the complete desktop bundle. They run only when invoked. They do not commit, push, upload, or publish anything. Repeat the existing Android validation script with private release signing configured to verify Android compatibility.
 
-Archives are written under ignored dist/: pouch-1.0.0-windows-x64.zip and pouch-1.0.0-linux-x64.tar.gz. They are unsigned portable application bundles, not installers. Extract the entire archive and run pouch.exe or ./pouch. Do not distribute the executable alone. Windows requires the compatible Microsoft Visual C++ runtime. Linux requires compatible glibc, GTK 3, graphics libraries and printer integration; a bundle built on Ubuntu 24.04 is not claimed to support older distributions.
+Archives are written under ignored dist/: pouch-2.0.0-windows-x64.zip and pouch-2.0.0-linux-x64.tar.gz. They are unsigned portable application bundles, not installers. Extract the entire archive and run pouch.exe or ./pouch. Do not distribute the executable alone. Windows requires the compatible Microsoft Visual C++ runtime. Linux requires compatible glibc, GTK 3, graphics libraries and printer integration; the published Version 2 bundle was built and tested on Ubuntu 26.04, and compatibility with Ubuntu 24.04 or older distributions has not been verified.
 
 ## Platform services and records
 
@@ -61,4 +61,4 @@ After source review and manual validation, pushing to main starts the workflow a
 - Preview, save and print short and multi-page reports. Verify Persian letters join correctly, RTL column order, mixed numbers/text, totals, dates and descriptions. Test no-printer and cancellation cases; opening the saved PDF externally must remain possible.
 - Verify the About profile link and Android startup, migration, themes, backups, printing and signed-device behavior.
 
-Compilation, automated tests, printed output and these runtime checks must be confirmed manually before a commit, push or release.
+For Version 2, manual builds, automated validation and application testing were confirmed on all three platforms. The Linux persistence, backup/restore, English/Persian display, report preview and PDF export checks passed. Physical-printer behavior and older Linux distribution compatibility are not claimed by this release record.

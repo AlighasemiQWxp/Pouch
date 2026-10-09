@@ -4,7 +4,7 @@
 
 # Pouch
 
-Pouch is an offline spending planner with a Flutter interface and a Rust core. Android is available, and Windows and Linux support is in preparation. It helps you plan a budget, record income and purchases, reserve money for upcoming expenses, track savings goals, and prepare reports.
+Pouch is an offline spending planner with a Flutter interface and a Rust core. Version 2 supports Android, Windows x64, and Linux x64. It helps you plan a budget, record income and purchases, reserve money for upcoming expenses, track savings goals, and prepare reports.
 
 The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp).
 
@@ -15,8 +15,8 @@ The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp)
 - Recorded income and future expected income, kept separate until it is marked received
 - Backdated income and purchases in Budget Plan and Today, including dates before first use; earlier records extend the first budget plan and carry-forward history
 - Income calendar and a simple monthly plan for savings and essential expenses
-- Financial Forecast with a shared target, clear completion/deadline status, expandable improvements and country comparison; manual validation pending (see [Financial Forecast](docs/FINANCIAL_FORECAST.md))
-- Standard Forecast with automatic data retrieval for all seven named countries, deadline saving and income requirements, currency conversion, offline caching and optional local assumptions; manual validation pending (see [Economic Profiles](docs/ECONOMIC_PROFILES.md))
+- Financial Forecast with a shared target, clear completion/deadline status, expandable improvements and country comparison (see [Financial Forecast](docs/FINANCIAL_FORECAST.md))
+- Standard Forecast with automatic data retrieval for all seven named countries, deadline saving and income requirements, currency conversion, offline caching and optional local assumptions (see [Economic Profiles](docs/ECONOMIC_PROFILES.md))
 - Daily spending recommendations with carry-forward balances
 - Planned expenses that reserve money until paid
 - Automatic savings allocations shared across goals, with funded progress, daily spending adjustments, and completion estimates
@@ -34,7 +34,7 @@ Reports calendars highlight the selected date range, individual days, full week,
 
 ## Project structure
 
-- flutter contains the Android interface, navigation, localization, and platform integration.
+- flutter contains the application interface, navigation, localization, and platform integration.
 - rust contains the budget domain, calculations, backup validation, and persistent storage.
 - ARCHITECTURE.md describes module responsibilities and data flow.
 - SECURITY.md explains data handling and vulnerability reporting.
@@ -52,7 +52,11 @@ If you change the Rust API, regenerate the Flutter bridge from the flutter direc
 
 ## Desktop support
 
-Windows x64 and Linux x64 runners, platform services, and manual packaging scripts are prepared. See [desktop build and acceptance instructions](docs/DESKTOP.md). Desktop compilation and runtime validation are pending; no desktop release is published. The Linux workflow runs on every push to main and on pull requests, and can also be started manually. It checks the Flutter frontend and Rust core, builds the Linux application, and uploads an Actions artifact rather than a release. Results appear in GitHub Actions and commit or pull-request checks.
+Windows x64 and Linux x64 runners, platform services, and manual packaging scripts are prepared. See [desktop build and acceptance instructions](docs/DESKTOP.md). Version 2 packages have passed manual build and runtime validation on Ubuntu 26.04 x64, Android, and Windows 11. Windows is an unsigned portable release. Ubuntu 24.04 compatibility of the published Linux package has not been verified. The Linux workflow runs on every push to main and on pull requests, and can also be started manually. It checks the Flutter frontend and Rust core, builds the Linux application, and uploads an Actions artifact rather than a release. Results appear in GitHub Actions and commit or pull-request checks.
+
+## Version 2
+
+Version 2.0.0 (Android build 4) packages are validated for Android, Linux x64, and Windows x64. See the [changelog](CHANGELOG.md), [release verification record](docs/RELEASE_V2.md), and [GitHub release](https://github.com/AlighasemiQWxp/Pouch/releases/tag/v2.0.0).
 
 ## Release signing and validation
 

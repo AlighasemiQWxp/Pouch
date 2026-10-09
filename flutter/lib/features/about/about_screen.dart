@@ -47,7 +47,7 @@ class AboutScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            _detail(context, strings.text('versionLabel'), '1.0'),
+            _detail(context, strings.text('versionLabel'), '2.0.0'),
             _detail(context, strings.text('developedBy'), 'AlighasemiQWxp'),
             const SizedBox(height: 13),
             OutlinedButton.icon(
