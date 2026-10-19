@@ -15,6 +15,7 @@ class PreferencesScreen extends StatefulWidget {
     required this.run,
     required this.themeStyle,
     required this.onThemeStyleChanged,
+    this.onOpenAbout,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class PreferencesScreen extends StatefulWidget {
   final String today;
   final PouchMutation run;
   final String themeStyle;
+  final VoidCallback? onOpenAbout;
   final Future<void> Function(String) onThemeStyleChanged;
 
   @override
@@ -47,110 +49,76 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       'new_zealand': 'countryNewZealand',
       'custom': 'countryCustom',
     };
-    return PouchPage(
-      children: [
-        PouchIntro(
-          eyebrow: strings.text('preferencesLabel'),
-          title: strings.text('preferencesPageTitle'),
-          description: strings.text('preferencesPageHint'),
-        ),
-        PouchCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final region = PouchCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PouchSectionHeading(title: strings.text('regionalSettings')),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            key: ValueKey('country-${preferences.country}'),
+            initialValue: preferences.country,
+            isExpanded: true,
+            decoration: InputDecoration(labelText: strings.text('country')),
+            items: [
+              for (final item in countries.entries)
+                DropdownMenuItem(
+                  value: item.key,
+                  child: Text(strings.text(item.value)),
+                ),
+            ],
+            onChanged: _busy ? null : (value) => _update(country: value),
+          ),
+          const SizedBox(height: 8),
+          Text(strings.text('countryHint')),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            key: ValueKey('currency-${preferences.currency}'),
+            initialValue: preferences.currency,
+            isExpanded: true,
+            decoration: InputDecoration(labelText: strings.text('currency')),
+            items: [
+              for (final item in [
+                'TOMAN',
+                'CAD',
+                'USD',
+                'EUR',
+                'GBP',
+                'AUD',
+                'NZD',
+              ])
+                DropdownMenuItem(value: item, child: Text(item)),
+            ],
+            onChanged: _busy ? null : (value) => _update(currency: value),
+          ),
+          const SizedBox(height: 8),
+          Text(strings.text('currencyHint')),
+          const SizedBox(height: 16),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(strings.text('calendarOptions')),
             children: [
-              PouchSectionHeading(title: strings.text('displaySettings')),
-              const SizedBox(height: 13),
               DropdownButtonFormField<String>(
-                initialValue: preferences.country,
-                decoration: InputDecoration(labelText: strings.text('country')),
-                items: countries.entries
-                    .map(
-                      (entry) => DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(strings.text(entry.value)),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: _busy ? null : (value) => _update(country: value),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                strings.text('countryHint'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 12,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 13),
-              DropdownButtonFormField<String>(
-                initialValue: preferences.currency,
-                decoration: InputDecoration(
-                  labelText: strings.text('currency'),
-                ),
-                items: const ['TOMAN', 'CAD', 'USD', 'EUR', 'GBP', 'AUD', 'NZD']
-                    .map(
-                      (value) =>
-                          DropdownMenuItem(value: value, child: Text(value)),
-                    )
-                    .toList(growable: false),
-                onChanged: _busy ? null : (value) => _update(currency: value),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                strings.text('currencyHint'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 12,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 13),
-              DropdownButtonFormField<String>(
+                key: ValueKey('calendar-${preferences.calendar}'),
                 initialValue: preferences.calendar,
+                isExpanded: true,
                 decoration: InputDecoration(
                   labelText: strings.text('displayCalendar'),
                 ),
                 items: [
-                  DropdownMenuItem(
-                    value: 'gregory',
-                    child: Text(strings.text('gregory')),
-                  ),
-                  DropdownMenuItem(
-                    value: 'persian',
-                    child: Text(strings.text('persian')),
-                  ),
+                  for (final item in ['gregory', 'persian'])
+                    DropdownMenuItem(
+                      value: item,
+                      child: Text(strings.text(item)),
+                    ),
                 ],
                 onChanged: _busy ? null : (value) => _update(calendar: value),
               ),
-              const SizedBox(height: 13),
-              DropdownButtonFormField<String>(
-                initialValue: widget.themeStyle,
-                decoration: InputDecoration(
-                  labelText: strings.text('themeStyle'),
-                ),
-                items: [
-                  for (final style in ['classic', 'ocean', 'forest'])
-                    DropdownMenuItem(
-                      value: style,
-                      child: Text(
-                        strings.text(
-                          'theme${style[0].toUpperCase()}${style.substring(1)}',
-                        ),
-                      ),
-                    ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (value) {
-                        if (value != null && value != widget.themeStyle) {
-                          _changeThemeStyle(value);
-                        }
-                      },
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               DropdownButtonFormField<int>(
+                key: ValueKey('week-${preferences.weekStart}'),
                 initialValue: preferences.weekStart,
+                isExpanded: true,
                 decoration: InputDecoration(
                   labelText: strings.text('weekStart'),
                 ),
@@ -170,54 +138,146 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                 ],
                 onChanged: _busy ? null : (value) => _update(weekStart: value),
               ),
-              const SizedBox(height: 8),
-              Text(
-                strings.text('dateHint'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 12,
-                  height: 1.5,
-                ),
-              ),
             ],
           ),
+        ],
+      ),
+    );
+    final appearance = PouchCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PouchSectionHeading(title: strings.text('appearanceSettings')),
+          const SizedBox(height: 16),
+          Text(strings.text('language')),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              for (final language in ['en', 'fa'])
+                ChoiceChip(
+                  label: Text(language == 'fa' ? 'فارسی' : 'English'),
+                  selected: preferences.language == language,
+                  onSelected: _busy ? null : (_) => _update(language: language),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(strings.text('themeStyle')),
+          const SizedBox(height: 8),
+          for (final style in ['classic', 'ocean', 'forest'])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                tileColor: PouchPalette.forStyle(style).selection,
+                selected: widget.themeStyle == style,
+                selectedTileColor: PouchPalette.forStyle(style).selection,
+                selectedColor: PouchPalette.forStyle(style).goldDeep,
+                leading: CircleAvatar(
+                  backgroundColor: PouchPalette.forStyle(style).goldDeep,
+                  radius: 12,
+                ),
+                title: Text(
+                  strings.text(
+                    'theme${style[0].toUpperCase()}${style.substring(1)}',
+                  ),
+                ),
+                trailing: widget.themeStyle == style
+                    ? const Icon(Icons.check_circle_outline)
+                    : null,
+                onTap: _busy ? null : () => _changeThemeStyle(style),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Text(strings.text('dateHint')),
+        ],
+      ),
+    );
+    return PouchPage(
+      children: [
+        PouchIntro(
+          eyebrow: strings.text('preferencesLabel'),
+          title: strings.text('preferencesPageTitle'),
+          description: strings.text('preferencesPageHint'),
         ),
-        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, size) => size.maxWidth >= 760
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: appearance),
+                    const SizedBox(width: 20),
+                    Expanded(child: region),
+                  ],
+                )
+              : Column(
+                  children: [appearance, const SizedBox(height: 16), region],
+                ),
+        ),
+        const SizedBox(height: 20),
         PouchCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               PouchSectionHeading(title: strings.text('dataLabel')),
               const SizedBox(height: 8),
-              Text(
-                strings.text('backupHint'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 12,
-                  height: 1.55,
-                ),
+              Text(strings.text('backupHint')),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _actionRow(
+                    'backup',
+                    Icons.file_upload_outlined,
+                    _exportBackup,
+                  ),
+                  _actionRow(
+                    'restore',
+                    Icons.file_download_outlined,
+                    _restoreBackup,
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _actionRow('backup', Icons.file_upload_outlined, _exportBackup),
-              _actionRow(
-                'restore',
-                Icons.file_download_outlined,
-                _restoreBackup,
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(strings.text('moreOptions')),
+                children: [
+                  _actionRow(
+                    'recovery',
+                    Icons.history_rounded,
+                    _exportRecovery,
+                  ),
+                ],
               ),
-              _actionRow('recovery', Icons.history_rounded, _exportRecovery),
-              const Divider(height: 24),
-              _actionRow(
-                'reset',
-                Icons.restart_alt_rounded,
-                _reset,
-                danger: true,
+              const Divider(height: 32),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(strings.text('reset')),
+                children: [
+                  _actionRow(
+                    'reset',
+                    Icons.restart_alt_rounded,
+                    _reset,
+                    danger: true,
+                  ),
+                ],
               ),
-              if (_busy)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: LinearProgressIndicator(minHeight: 2),
-                ),
+              if (_busy) const LinearProgressIndicator(),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        PouchCard(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.info_outline),
+            title: Text(strings.text('navAbout')),
+            onTap: widget.onOpenAbout,
           ),
         ),
       ],
@@ -256,6 +316,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
 
   Future<void> _update({
     String? country,
+    String? language,
     String? currency,
     String? calendar,
     int? weekStart,
@@ -264,7 +325,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       () => widget.bridge.updatePreferences(
         country: country ?? widget.snapshot.preferences.country,
         currency: currency ?? widget.snapshot.preferences.currency,
-        language: widget.snapshot.preferences.language,
+        language: language ?? widget.snapshot.preferences.language,
         calendar: calendar ?? widget.snapshot.preferences.calendar,
         weekStart: weekStart ?? widget.snapshot.preferences.weekStart,
       ),

@@ -8,99 +8,87 @@ Pouch is an offline spending planner with a Flutter interface and a Rust core. V
 
 The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp).
 
+The default Classic theme uses cream and light brown. The interface bundles Vazirmatn for offline Persian and English text. Mobile navigation groups Today, Budget, and Plans alongside More; desktop navigation exposes the additional tools in the sidebar. About is available from Settings.
+
+Periods can be edited or deleted from Budget Plan. Deletion requires confirmation and is available only for periods without linked financial records. Removing an unused period extends an adjacent period to keep the calendar continuous.
+
 ## App walkthrough
 
-These Android screenshots show Pouch in Persian. Follow the guide below to record income, plan spending, and review your progress. Click any screenshot to view it at full size.
+These Android screenshots show the English interface with the Classic theme and Jalali dates. Pouch also supports Persian and runs on Linux and Windows.
 
-### 1. Today: check your daily spending
+### 1. Today: review a day and record expenses
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-48-05-637_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-48-05-637_com.daybook.app.jpg" alt="Daily spending recommendation and purchase entry" width="360">
+  <a href="ScreenShots/IMG_20261019_224301.jpg">
+    <img src="ScreenShots/IMG_20261019_224301.jpg" alt="Today with date selection, available spending, and expense entry" width="360">
   </a>
 </p>
 
-Today shows how much the plan recommends you can still spend on the selected day, after recorded purchases and reserved expenses. Use the arrows or calendar to change the date, expand the calculation to understand the amount, and record purchases in the form below. Open Purchase history to review or edit earlier entries.
+Choose a date with the calendar or day arrows, review the available spending, and record purchases in the list underneath. Future entries become planned expenses until paid. Budget details expand when needed. The selected period is named above the daily view; changing periods preserves your selected calendar date.
 
-### 2. Budget Plan: record received income
+### 2. Budget Plan: manage periods, income, and savings
+
+Create a period, select it from the named period selector, and use Edit period or Delete period to manage it. Deletion requires confirmation and protects periods with linked financial records. Choose a date directly in the income calendar, enter an amount, and press Add Income or Save Income. The active period is selected by default, and assignment is independent of the receipt date. Future income remains expected until received. Savings settings and earlier revisions are available in the same tab.
+
+### 3. Plans: upcoming expenses and savings goals
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-48-24-141_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-48-24-141_com.daybook.app.jpg" alt="Income entry and calendar in Budget Plan" width="360">
+  <a href="ScreenShots/IMG_20261019_224323.jpg">
+    <img src="ScreenShots/IMG_20261019_224323.jpg" alt="Plans with a named period and a car savings goal" width="360">
   </a>
 </p>
 
-Enter the amount you received, select its date, and save the income. The calendar shows recorded income, and the pencil and trash icons let you edit or remove an entry. Received income funds your budget; expected income stays separate until it is marked received.
+Choose a period, switch between Expenses and Savings goals, and add a target with an amount and date. Each entry can belong to a period independently of its due date. Record payment when money is actually spent; use the entry menu to edit or delete it. Set-aside amounts are budget allocations, not transfers to a separate bank account.
 
-### 3. Budget Plan: set your monthly plan
+### 4. Financial Forecast: estimate when you can afford a goal
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-48-27-219_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-48-27-219_com.daybook.app.jpg" alt="Monthly savings and essential expense settings" width="360">
+  <a href="ScreenShots/IMG_20261019_224356.jpg">
+    <img src="ScreenShots/IMG_20261019_224356.jpg" alt="Personal forecast with period selection and a savings goal estimate" width="360">
   </a>
 </p>
 
-Set your minimum monthly savings and add essential monthly expenses, then save the plan. Pouch uses your income, expenses, and goals to calculate daily spending recommendations. Changes normally apply from today; the advanced date option lets you choose when a change takes effect.
+Select a period at the top, then choose an expense or savings goal. Review the estimated completion date and expand the budget details or spending scenarios when needed. Forecasts are estimates based on the plan, not guaranteed outcomes.
 
-### 4. Planned expenses: organize upcoming costs and goals
+### 5. Compare a country scenario
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-48-34-848_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-48-34-848_com.daybook.app.jpg" alt="Planned expenses and a car savings goal" width="360">
+  <a href="ScreenShots/IMG_20261019_224437.jpg">
+    <img src="ScreenShots/IMG_20261019_224437.jpg" alt="Country comparison showing income, saving capacity, and estimated completion" width="360">
   </a>
 </p>
 
-Choose Add plan to create an upcoming expense or savings goal with an amount and target date. The list shows each target and its allocated funds. Use the filter to review payment status, the pencil to edit, or the checkmark to record payment when it happens. Allocated savings are part of the budget calculation, not a transfer to a separate bank account.
+The country comparison uses today and its own target selection. Explore estimated take-home income, saving capacity, currency conversion, and completion dates without changing your budget. Expand Sources, reference periods and assumptions to inspect the calculation.
 
-### 5. Financial Forecast: see when a goal could be funded
+### 6. Reports: review spending and export a PDF
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-49-01-556_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-49-01-556_com.daybook.app.jpg" alt="Selected savings goal and estimated completion date" width="360">
+  <a href="ScreenShots/IMG_20261019_224454.jpg">
+    <img src="ScreenShots/IMG_20261019_224454.jpg" alt="Report date selection and PDF export" width="360">
   </a>
 </p>
 
-Select an expense or savings goal to see the remaining amount, estimated completion date, and whether your current plan can meet its deadline. Expand How this is calculated to review the assumptions. Further down, explore changes to spending or income and compare country scenarios. Forecasts are estimates based on the plan, not guaranteed outcomes.
+Choose specific days, a date range, a week, or a month, then press Show report. Reports separate actual spending from unpaid plans and include category totals, daily totals, and individual purchases. Use Export PDF to prepare a printable report.
 
-### 6. Reports: choose what to review
+### 7. Settings: language and appearance
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-49-54-365_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-49-54-365_com.daybook.app.jpg" alt="Report period selector and day selection" width="360">
+  <a href="ScreenShots/IMG_20261019_224518.jpg">
+    <img src="ScreenShots/IMG_20261019_224518.jpg" alt="Settings with language selection and Classic, Ocean, and Forest themes" width="360">
   </a>
 </p>
 
-Choose a report period: individual days, a date range, a week, or a month. For individual days, use Add day to select one or more dates, then choose Show report. Week and month selection follow the calendar and week-start preferences in Settings.
+Choose English or Persian and select Classic, Ocean, or Forest. Classic is the default cream and light brown theme. Both languages use the bundled Vazirmatn font.
 
-### 7. Reports: understand your spending
+### 8. Settings: regional preferences and backups
 
 <p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-49-59-157_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-49-59-157_com.daybook.app.jpg" alt="Expense report with totals, categories, and purchase details" width="360">
+  <a href="ScreenShots/IMG_20261019_224553.jpg">
+    <img src="ScreenShots/IMG_20261019_224553.jpg" alt="Regional preferences and local backup controls" width="360">
   </a>
 </p>
 
-The report summarizes actual spending, category totals, daily totals, and individual purchases for your selection. Unpaid planned expenses are shown separately from actual spending. Use the PDF button to prepare a printable report.
-
-### 8. Settings: choose regional and display preferences
-
-<p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-50-10-009_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-50-10-009_com.daybook.app.jpg" alt="Country, currency, calendar, theme, and week-start settings" width="360">
-  </a>
-</p>
-
-Choose your country, currency label, calendar, theme, and first day of the week. Country selection supplies regional defaults, while the calendar and week start can be adjusted manually. Changing the currency label does not convert saved amounts. The screenshots show the Persian interface with the Jalali calendar; English is also available.
-
-### 9. Settings: back up and restore your data
-
-<p align="center">
-  <a href="ScreenShots/Screenshot_2026-10-10-16-50-15-740_com.daybook.app.jpg">
-    <img src="ScreenShots/Screenshot_2026-10-10-16-50-15-740_com.daybook.app.jpg" alt="Local backup, restore, recovery export, and reset controls" width="360">
-  </a>
-</p>
-
-Use Export backup to save a copy of your local data and Restore backup to load a saved copy. Export recovery copy provides the saved recovery data when available. Keep a backup before uninstalling the app or clearing its data; Reset clears the app data.
+Country selection supplies regional defaults. Calendar and week start can be adjusted independently. Currency labels do not convert recorded amounts. Export a backup before uninstalling or clearing app data; restore backups from Settings. Recovery and reset controls are under More options.
 
 ## Features
 
@@ -108,7 +96,8 @@ Use Export backup to save a copy of your local data and Restore backup to load a
 - Country-based currency, calendar, and week-start defaults, with manual calendar and week-start choices
 - Recorded income and future expected income, kept separate until it is marked received
 - Backdated income and purchases in Budget Plan and Today, including dates before first use; earlier records extend the first budget plan and carry-forward history
-- Income calendar and a simple monthly plan for savings and essential expenses
+- Income calendar with explicit period choices, editable planning horizons, rollover, period savings plans, and independently recurring essential bills
+- Responsive desktop/mobile navigation, daily expenses within Today, combined expenses and savings goals in Plans, and consistent English/Persian presentation
 - Financial Forecast with a shared target, clear completion/deadline status, expandable improvements and country comparison (see [Financial Forecast](docs/FINANCIAL_FORECAST.md))
 - Standard Forecast with automatic data retrieval for all seven named countries, deadline saving and income requirements, currency conversion, offline caching and optional local assumptions (see [Economic Profiles](docs/ECONOMIC_PROFILES.md))
 - Daily spending recommendations with carry-forward balances
@@ -120,9 +109,9 @@ Use Export backup to save a copy of your local data and Restore backup to load a
 
 Pouch keeps budgeting data on the device. Its recommendations are calculations from recorded income and expenses, not a bank balance or a promise of future income.
 
-Budget Plan uses the calendar chosen in Settings. Received income funds daily recommendations; manual salary, base allowance, payday, and daily overrides are no longer used. Existing backup fields remain readable for compatibility. Monthly savings is a minimum: goals can increase the shared allocation, while essential expenses and recorded spending reduce available funds. Goal progress describes funds allocated by the model, not money transferred to a separate account. Goal completion estimates assume similar future received income and spending; expected income never funds current progress. Target dates determine goal priority. Changing a goal recalculates allocations from the recorded history.
+Explicit periods retain stable IDs and their original planning calendar; changing the display calendar does not move saved dates. Shared boundaries and plan references are validated transactionally. Only received income funds recommendations. Cash and deficits carry forward without creating synthetic income. Pending expenses are reserved before savings; essential bills are included in that reservation once. Savings allocations are recorded, and goal payments consume them. Expected income remains separate until received, including when its actual date or amount differs. Financial forecasts are read-only estimates. See [data formats](docs/DATA_FORMAT.md) for the intentional storage break and [architecture](ARCHITECTURE.md) for the accounting rules.
 
-Today shows the spending recommendation, expense entry, and relevant planned expenses. Purchase history opens only when requested, without search or category filters.
+Today shows the spending recommendation, expense entry, and relevant planned expenses. Expense history opens only when requested, with name search and date filtering for paid and planned expenses.
 
 Reports calendars highlight the selected date range, individual days, full week, or full month. Weekly selection follows the chosen week start, and monthly selection follows the Gregorian or Jalali calendar chosen in Settings. Selecting a date updates the corresponding range endpoint, adds an individual day, or chooses the week or month to report.
 
@@ -174,7 +163,7 @@ In PowerShell, set the properties file location and run validation from the repo
 
 The script checks Rust formatting, Clippy and tests, Flutter analysis and available tests, then builds the signed APK at `flutter/build/app/outputs/flutter-apk/app-release.apk`. Debug builds do not require signing credentials. Release builds fail when credentials are missing and never fall back to the debug key.
 
-Verify the new APK on an Android device before publishing. An installation signed with the debug key cannot be updated by this release key. Export a backup before uninstalling that installation, then restore it in the signed app.
+Verify the new APK on an Android device before publishing. An installation signed with the debug key cannot be updated by this release key. Export a backup before uninstalling that installation, then restore it in the signed app if both installations use the current backup format. Older development backups are intentionally unsupported.
 
 ## License
 

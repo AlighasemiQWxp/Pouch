@@ -51,10 +51,10 @@ class _DesktopReportDialogState extends State<DesktopReportDialog> {
   @override
   Widget build(BuildContext context) => Dialog(
     child: SizedBox(
-      width: 900,
+      width: 1100,
       height: MediaQuery.sizeOf(context).height * 0.85,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Text(

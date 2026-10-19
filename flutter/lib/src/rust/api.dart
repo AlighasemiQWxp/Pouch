@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_exchange_rate`, `parse_language`, `parse_planned_kind`, `parse_week_start`, `planned_kind_name`, `planned_status_name`, `report_snapshot`, `snapshot`, `week_start_number`
+// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_exchange_rate`, `parse_language`, `parse_planned_kind`, `parse_recurrence`, `parse_week_start`, `period_snapshot`, `plan_snapshot`, `planned_kind_name`, `planned_snapshot_at`, `planned_snapshot`, `planned_status_name`, `recurrence_days`, `recurrence_name`, `report_snapshot`, `snapshot`, `week_start_number`
 
 Future<String> economicCountries() =>
     RustLib.instance.api.crateApiEconomicCountries();
@@ -20,6 +20,12 @@ Future<String> downloadEconomicProfile({
   currency: currency,
 );
 
+Future<void> resetIncompatibleStorage({
+  required String applicationDataDirectory,
+}) => RustLib.instance.api.crateApiResetIncompatibleStorage(
+  applicationDataDirectory: applicationDataDirectory,
+);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>>
 abstract class PouchApp implements RustOpaqueInterface {
   Future<AppSnapshot> addPurchase({
@@ -30,7 +36,10 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String category,
   });
 
-  Future<BudgetSnapshot> budgetSummary({required String date});
+  Future<BudgetSnapshot> budgetSummary({
+    required String date,
+    String? periodId,
+  });
 
   Future<void> cacheEconomicProfile({required String contents});
 
@@ -77,16 +86,12 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String selectedId,
     required bool recommended,
     required bool incomeRequired,
+    String? periodId,
   });
 
   Future<List<GoalForecastSnapshot>> goalForecast({required String asOf});
 
   Future<AppSnapshot> importBackup({required String contents});
-
-  Future<AppSnapshot> markExpectedIncomeReceived({
-    required String id,
-    required String receivedDate,
-  });
 
   Future<AppSnapshot> markPlannedPaid({
     required String planId,
@@ -103,17 +108,17 @@ abstract class PouchApp implements RustOpaqueInterface {
     legacyJsonCandidates: legacyJsonCandidates,
   );
 
-  Future<AppSnapshot> recordIncome({
-    required String id,
-    required String date,
-    required String amount,
-  });
+  Future<PeriodViewSnapshot> periodView({required String date});
+
+  Future<AppSnapshot> receiveIncome({required ReceiveIncomeRequest receipt});
 
   Future<AppSnapshot> removeBudgetPlan({required String effective});
 
   Future<AppSnapshot> removeExpectedIncome({required String id});
 
   Future<AppSnapshot> removeIncome({required String id});
+
+  Future<AppSnapshot> removePeriod({required String id});
 
   Future<AppSnapshot> removePlanned({required String id});
 
@@ -144,14 +149,26 @@ abstract class PouchApp implements RustOpaqueInterface {
   Future<AppSnapshot> resetEconomicProfile({required String country});
 
   Future<AppSnapshot> saveBudgetPlan({
+    required String periodId,
     required String effective,
-    String? salary,
-    required String dailyBudget,
-    required List<String> expenseIds,
-    required List<String> expenseNames,
-    required List<String> expenseAmounts,
     required String savings,
-    required int payday,
+  });
+
+  Future<AppSnapshot> saveEssentialExpense({
+    required String id,
+    required String name,
+    required String amount,
+    required String date,
+    required String kind,
+    required int customDays,
+  });
+
+  Future<AppSnapshot> savePeriod({
+    String? id,
+    required String start,
+    required String kind,
+    required int customDays,
+    String? through,
   });
 
   Future<AppSnapshot> savePlanned({
@@ -161,15 +178,15 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String category,
     required String kind,
     required String date,
+    String? periodId,
   });
 
   Future<AppSnapshot> scheduleIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   });
-
-  Future<AppSnapshot> setDailyOverride({required String date, String? amount});
 
   Future<AppSnapshot> snapshot();
 
@@ -177,6 +194,11 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String asOf,
     required String selectedId,
     required String country,
+  });
+
+  Future<AppSnapshot> stopEssentialExpense({
+    required String id,
+    required String date,
   });
 
   Future<String> today();
@@ -187,12 +209,14 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   });
 
   Future<AppSnapshot> updateIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   });
 
   Future<AppSnapshot> updatePreferences({
@@ -213,6 +237,11 @@ class AppSnapshot {
   final List<IncomeSnapshot> income;
   final List<ExpectedIncomeSnapshot> expectedIncome;
   final List<BudgetPlanSnapshot> plans;
+  final BudgetPlanSnapshot currentPlan;
+  final PeriodSnapshot? currentPeriod;
+  final List<PeriodSnapshot> periods;
+  final List<RequiredExpenseSnapshot> essentials;
+  final List<IncomeDaySnapshot> incomeDays;
   final List<DaySnapshot> days;
   final List<PlannedSnapshot> planned;
 
@@ -225,6 +254,11 @@ class AppSnapshot {
     required this.income,
     required this.expectedIncome,
     required this.plans,
+    required this.currentPlan,
+    this.currentPeriod,
+    required this.periods,
+    required this.essentials,
+    required this.incomeDays,
     required this.days,
     required this.planned,
   });
@@ -239,6 +273,11 @@ class AppSnapshot {
       income.hashCode ^
       expectedIncome.hashCode ^
       plans.hashCode ^
+      currentPlan.hashCode ^
+      currentPeriod.hashCode ^
+      periods.hashCode ^
+      essentials.hashCode ^
+      incomeDays.hashCode ^
       days.hashCode ^
       planned.hashCode;
 
@@ -255,55 +294,37 @@ class AppSnapshot {
           income == other.income &&
           expectedIncome == other.expectedIncome &&
           plans == other.plans &&
+          currentPlan == other.currentPlan &&
+          currentPeriod == other.currentPeriod &&
+          periods == other.periods &&
+          essentials == other.essentials &&
+          incomeDays == other.incomeDays &&
           days == other.days &&
           planned == other.planned;
 }
 
 class BudgetPlanSnapshot {
+  final String periodId;
   final String effective;
-  final int? salary;
-  final int dailyBudget;
-  final List<RequiredExpenseSnapshot> expenses;
   final int savings;
-  final int payday;
-  final String calendar;
-  final bool legacy;
 
   const BudgetPlanSnapshot({
+    required this.periodId,
     required this.effective,
-    this.salary,
-    required this.dailyBudget,
-    required this.expenses,
     required this.savings,
-    required this.payday,
-    required this.calendar,
-    required this.legacy,
   });
 
   @override
-  int get hashCode =>
-      effective.hashCode ^
-      salary.hashCode ^
-      dailyBudget.hashCode ^
-      expenses.hashCode ^
-      savings.hashCode ^
-      payday.hashCode ^
-      calendar.hashCode ^
-      legacy.hashCode;
+  int get hashCode => periodId.hashCode ^ effective.hashCode ^ savings.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is BudgetPlanSnapshot &&
           runtimeType == other.runtimeType &&
+          periodId == other.periodId &&
           effective == other.effective &&
-          salary == other.salary &&
-          dailyBudget == other.dailyBudget &&
-          expenses == other.expenses &&
-          savings == other.savings &&
-          payday == other.payday &&
-          calendar == other.calendar &&
-          legacy == other.legacy;
+          savings == other.savings;
 }
 
 class BudgetSnapshot {
@@ -319,6 +340,7 @@ class BudgetSnapshot {
   final int savings;
   final int funds;
   final int reserved;
+  final int fundedExpenses;
   final int recommendation;
   final int shortfall;
 
@@ -335,6 +357,7 @@ class BudgetSnapshot {
     required this.savings,
     required this.funds,
     required this.reserved,
+    required this.fundedExpenses,
     required this.recommendation,
     required this.shortfall,
   });
@@ -353,6 +376,7 @@ class BudgetSnapshot {
       savings.hashCode ^
       funds.hashCode ^
       reserved.hashCode ^
+      fundedExpenses.hashCode ^
       recommendation.hashCode ^
       shortfall.hashCode;
 
@@ -373,6 +397,7 @@ class BudgetSnapshot {
           savings == other.savings &&
           funds == other.funds &&
           reserved == other.reserved &&
+          fundedExpenses == other.fundedExpenses &&
           recommendation == other.recommendation &&
           shortfall == other.shortfall;
 }
@@ -474,13 +499,12 @@ class DatePartsSnapshot {
 
 class DaySnapshot {
   final String date;
-  final int? budget;
   final List<PurchaseSnapshot> purchases;
 
-  const DaySnapshot({required this.date, this.budget, required this.purchases});
+  const DaySnapshot({required this.date, required this.purchases});
 
   @override
-  int get hashCode => date.hashCode ^ budget.hashCode ^ purchases.hashCode;
+  int get hashCode => date.hashCode ^ purchases.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -488,29 +512,32 @@ class DaySnapshot {
       other is DaySnapshot &&
           runtimeType == other.runtimeType &&
           date == other.date &&
-          budget == other.budget &&
           purchases == other.purchases;
 }
 
 class ExpectedIncomeSnapshot {
+  final String? periodId;
   final String id;
   final String date;
   final int amount;
 
   const ExpectedIncomeSnapshot({
+    this.periodId,
     required this.id,
     required this.date,
     required this.amount,
   });
 
   @override
-  int get hashCode => id.hashCode ^ date.hashCode ^ amount.hashCode;
+  int get hashCode =>
+      periodId.hashCode ^ id.hashCode ^ date.hashCode ^ amount.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ExpectedIncomeSnapshot &&
           runtimeType == other.runtimeType &&
+          periodId == other.periodId &&
           id == other.id &&
           date == other.date &&
           amount == other.amount;
@@ -523,11 +550,11 @@ class FinancialForecastSnapshot {
   final int? extraDays;
   final int? fasterDays;
   final int contribution;
-  final int monthlyIncome;
+  final int periodIncome;
   final int dailyAllowance;
   final int? requiredIncome;
   final int dailyLimit;
-  final int? monthlySaving;
+  final int? periodSaving;
   final int? incomeGap;
   final int spendingReduction;
   final int allocated;
@@ -545,11 +572,11 @@ class FinancialForecastSnapshot {
     this.extraDays,
     this.fasterDays,
     required this.contribution,
-    required this.monthlyIncome,
+    required this.periodIncome,
     required this.dailyAllowance,
     this.requiredIncome,
     required this.dailyLimit,
-    this.monthlySaving,
+    this.periodSaving,
     this.incomeGap,
     required this.spendingReduction,
     required this.allocated,
@@ -569,11 +596,11 @@ class FinancialForecastSnapshot {
       extraDays.hashCode ^
       fasterDays.hashCode ^
       contribution.hashCode ^
-      monthlyIncome.hashCode ^
+      periodIncome.hashCode ^
       dailyAllowance.hashCode ^
       requiredIncome.hashCode ^
       dailyLimit.hashCode ^
-      monthlySaving.hashCode ^
+      periodSaving.hashCode ^
       incomeGap.hashCode ^
       spendingReduction.hashCode ^
       allocated.hashCode ^
@@ -595,11 +622,11 @@ class FinancialForecastSnapshot {
           extraDays == other.extraDays &&
           fasterDays == other.fasterDays &&
           contribution == other.contribution &&
-          monthlyIncome == other.monthlyIncome &&
+          periodIncome == other.periodIncome &&
           dailyAllowance == other.dailyAllowance &&
           requiredIncome == other.requiredIncome &&
           dailyLimit == other.dailyLimit &&
-          monthlySaving == other.monthlySaving &&
+          periodSaving == other.periodSaving &&
           incomeGap == other.incomeGap &&
           spendingReduction == other.spendingReduction &&
           allocated == other.allocated &&
@@ -614,7 +641,7 @@ class FinancialForecastSnapshot {
 class GoalForecastSnapshot {
   final String id;
   final int periods;
-  final int? requiredMonthly;
+  final int? requiredPerPeriod;
   final int projected;
   final int percent;
   final int? difference;
@@ -625,7 +652,7 @@ class GoalForecastSnapshot {
   const GoalForecastSnapshot({
     required this.id,
     required this.periods,
-    this.requiredMonthly,
+    this.requiredPerPeriod,
     required this.projected,
     required this.percent,
     this.difference,
@@ -638,7 +665,7 @@ class GoalForecastSnapshot {
   int get hashCode =>
       id.hashCode ^
       periods.hashCode ^
-      requiredMonthly.hashCode ^
+      requiredPerPeriod.hashCode ^
       projected.hashCode ^
       percent.hashCode ^
       difference.hashCode ^
@@ -653,7 +680,7 @@ class GoalForecastSnapshot {
           runtimeType == other.runtimeType &&
           id == other.id &&
           periods == other.periods &&
-          requiredMonthly == other.requiredMonthly &&
+          requiredPerPeriod == other.requiredPerPeriod &&
           projected == other.projected &&
           percent == other.percent &&
           difference == other.difference &&
@@ -662,28 +689,202 @@ class GoalForecastSnapshot {
           dailyReduction == other.dailyReduction;
 }
 
+class IncomeDaySnapshot {
+  final String date;
+  final int received;
+  final int expected;
+  final int count;
+
+  const IncomeDaySnapshot({
+    required this.date,
+    required this.received,
+    required this.expected,
+    required this.count,
+  });
+
+  @override
+  int get hashCode =>
+      date.hashCode ^ received.hashCode ^ expected.hashCode ^ count.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is IncomeDaySnapshot &&
+          runtimeType == other.runtimeType &&
+          date == other.date &&
+          received == other.received &&
+          expected == other.expected &&
+          count == other.count;
+}
+
 class IncomeSnapshot {
+  final String? periodId;
   final String id;
   final String date;
   final int amount;
 
   const IncomeSnapshot({
+    this.periodId,
     required this.id,
     required this.date,
     required this.amount,
   });
 
   @override
-  int get hashCode => id.hashCode ^ date.hashCode ^ amount.hashCode;
+  int get hashCode =>
+      periodId.hashCode ^ id.hashCode ^ date.hashCode ^ amount.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is IncomeSnapshot &&
           runtimeType == other.runtimeType &&
+          periodId == other.periodId &&
           id == other.id &&
           date == other.date &&
           amount == other.amount;
+}
+
+class PeriodSnapshot {
+  final String name;
+  final String id;
+  final String start;
+  final String end;
+  final String previousDate;
+  final String changeFrom;
+  final String status;
+  final int income;
+  final int expenses;
+  final int savings;
+  final int plannedSavings;
+  final int contributedSavings;
+  final int remaining;
+  final int carry;
+  final int reserved;
+  final int fundedExpenses;
+  final String nextDate;
+  final String recurrence;
+  final int customDays;
+  final String calendar;
+
+  const PeriodSnapshot({
+    required this.name,
+    required this.id,
+    required this.start,
+    required this.end,
+    required this.previousDate,
+    required this.changeFrom,
+    required this.status,
+    required this.income,
+    required this.expenses,
+    required this.savings,
+    required this.plannedSavings,
+    required this.contributedSavings,
+    required this.remaining,
+    required this.carry,
+    required this.reserved,
+    required this.fundedExpenses,
+    required this.nextDate,
+    required this.recurrence,
+    required this.customDays,
+    required this.calendar,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      id.hashCode ^
+      start.hashCode ^
+      end.hashCode ^
+      previousDate.hashCode ^
+      changeFrom.hashCode ^
+      status.hashCode ^
+      income.hashCode ^
+      expenses.hashCode ^
+      savings.hashCode ^
+      plannedSavings.hashCode ^
+      contributedSavings.hashCode ^
+      remaining.hashCode ^
+      carry.hashCode ^
+      reserved.hashCode ^
+      fundedExpenses.hashCode ^
+      nextDate.hashCode ^
+      recurrence.hashCode ^
+      customDays.hashCode ^
+      calendar.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PeriodSnapshot &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          id == other.id &&
+          start == other.start &&
+          end == other.end &&
+          previousDate == other.previousDate &&
+          changeFrom == other.changeFrom &&
+          status == other.status &&
+          income == other.income &&
+          expenses == other.expenses &&
+          savings == other.savings &&
+          plannedSavings == other.plannedSavings &&
+          contributedSavings == other.contributedSavings &&
+          remaining == other.remaining &&
+          carry == other.carry &&
+          reserved == other.reserved &&
+          fundedExpenses == other.fundedExpenses &&
+          nextDate == other.nextDate &&
+          recurrence == other.recurrence &&
+          customDays == other.customDays &&
+          calendar == other.calendar;
+}
+
+class PeriodViewSnapshot {
+  final PeriodSnapshot period;
+  final BudgetPlanSnapshot plan;
+  final BudgetSnapshot budget;
+  final List<IncomeSnapshot> income;
+  final List<ExpectedIncomeSnapshot> expectedIncome;
+  final int expectedTotal;
+  final List<PlannedSnapshot> targets;
+  final List<PlannedSnapshot> obligations;
+
+  const PeriodViewSnapshot({
+    required this.period,
+    required this.plan,
+    required this.budget,
+    required this.income,
+    required this.expectedIncome,
+    required this.expectedTotal,
+    required this.targets,
+    required this.obligations,
+  });
+
+  @override
+  int get hashCode =>
+      period.hashCode ^
+      plan.hashCode ^
+      budget.hashCode ^
+      income.hashCode ^
+      expectedIncome.hashCode ^
+      expectedTotal.hashCode ^
+      targets.hashCode ^
+      obligations.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PeriodViewSnapshot &&
+          runtimeType == other.runtimeType &&
+          period == other.period &&
+          plan == other.plan &&
+          budget == other.budget &&
+          income == other.income &&
+          expectedIncome == other.expectedIncome &&
+          expectedTotal == other.expectedTotal &&
+          targets == other.targets &&
+          obligations == other.obligations;
 }
 
 class PlannedReportSnapshot {
@@ -722,6 +923,7 @@ class PlannedReportSnapshot {
 }
 
 class PlannedSnapshot {
+  final String? periodId;
   final String id;
   final String description;
   final int amount;
@@ -731,8 +933,10 @@ class PlannedSnapshot {
   final String status;
   final String? paidDate;
   final String? purchaseId;
+  final String? essentialId;
 
   const PlannedSnapshot({
+    this.periodId,
     required this.id,
     required this.description,
     required this.amount,
@@ -742,10 +946,12 @@ class PlannedSnapshot {
     required this.status,
     this.paidDate,
     this.purchaseId,
+    this.essentialId,
   });
 
   @override
   int get hashCode =>
+      periodId.hashCode ^
       id.hashCode ^
       description.hashCode ^
       amount.hashCode ^
@@ -754,13 +960,15 @@ class PlannedSnapshot {
       date.hashCode ^
       status.hashCode ^
       paidDate.hashCode ^
-      purchaseId.hashCode;
+      purchaseId.hashCode ^
+      essentialId.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PlannedSnapshot &&
           runtimeType == other.runtimeType &&
+          periodId == other.periodId &&
           id == other.id &&
           description == other.description &&
           amount == other.amount &&
@@ -769,7 +977,8 @@ class PlannedSnapshot {
           date == other.date &&
           status == other.status &&
           paidDate == other.paidDate &&
-          purchaseId == other.purchaseId;
+          purchaseId == other.purchaseId &&
+          essentialId == other.essentialId;
 }
 
 class PreferencesSnapshot {
@@ -840,6 +1049,57 @@ class PurchaseSnapshot {
           amount == other.amount &&
           category == other.category &&
           fundedByGoal == other.fundedByGoal;
+}
+
+class ReceiveIncomeRequest {
+  final String id;
+  final String date;
+  final String amount;
+  final String? periodId;
+  final bool startNew;
+  final String kind;
+  final int customDays;
+  final String? through;
+  final bool expected;
+
+  const ReceiveIncomeRequest({
+    required this.id,
+    required this.date,
+    required this.amount,
+    this.periodId,
+    required this.startNew,
+    required this.kind,
+    required this.customDays,
+    this.through,
+    required this.expected,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      date.hashCode ^
+      amount.hashCode ^
+      periodId.hashCode ^
+      startNew.hashCode ^
+      kind.hashCode ^
+      customDays.hashCode ^
+      through.hashCode ^
+      expected.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReceiveIncomeRequest &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          date == other.date &&
+          amount == other.amount &&
+          periodId == other.periodId &&
+          startNew == other.startNew &&
+          kind == other.kind &&
+          customDays == other.customDays &&
+          through == other.through &&
+          expected == other.expected;
 }
 
 class ReportEntrySnapshot {
@@ -928,15 +1188,30 @@ class RequiredExpenseSnapshot {
   final String id;
   final String name;
   final int amount;
+  final String date;
+  final String recurrence;
+  final int customDays;
+  final String? until;
 
   const RequiredExpenseSnapshot({
     required this.id,
     required this.name,
     required this.amount,
+    required this.date,
+    required this.recurrence,
+    required this.customDays,
+    this.until,
   });
 
   @override
-  int get hashCode => id.hashCode ^ name.hashCode ^ amount.hashCode;
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      amount.hashCode ^
+      date.hashCode ^
+      recurrence.hashCode ^
+      customDays.hashCode ^
+      until.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -945,5 +1220,9 @@ class RequiredExpenseSnapshot {
           runtimeType == other.runtimeType &&
           id == other.id &&
           name == other.name &&
-          amount == other.amount;
+          amount == other.amount &&
+          date == other.date &&
+          recurrence == other.recurrence &&
+          customDays == other.customDays &&
+          until == other.until;
 }

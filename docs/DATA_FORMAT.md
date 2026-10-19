@@ -1,21 +1,31 @@
 # Pouch data formats
 
-Pouch stores its active state in an app-private, versioned binary file. Portable JSON backups are available for export and restore.
+The named-period update preserves the immediately previous Flutter/Rust data format. It does not import legacy WebView data or older incompatible development formats. Incompatible files are never silently deleted or overwritten.
 
 ## Binary state
 
-The Rust storage layer encodes state with Serde and Postcard. A fixed marker, format version, payload length, and checksum protect the file from incomplete or invalid writes. Updates are written to a temporary file in the same private directory and atomically replace the primary file only after validation. A recovery copy is kept for use if the primary cannot be read.
+The binary envelope is version **4**, and AppState schema is **6**. The envelope contains `POUCHDAT`, the version, payload length, checksum, and Serde/Postcard payload. Money is integer minor units; dates are Gregorian day offsets. Validated mutations use same-directory atomic writes and retain a recovery copy.
 
-The current state schema is version 2. It adds the country preference and a separate list of expected income. Version 1 state files are migrated on load without changing their existing currency, language, calendar, week start, or recorded income.
+Envelope 3/schema 5 is upgraded through a dedicated adapter; the existing financial records and internal IDs are preserved. On application open, generated names are persisted in the new format while the previous valid bytes remain in the recovery file. Unsupported envelopes or schemas return an incompatibility error without falling back to another format. A confirmed incompatible-data reset moves both existing `pouch.data` and `pouch.data.backup` into a unique `incompatible-<timestamp>` directory before creating an empty current-format state. Legacy JSON candidates remain rejected and are not migrated. Corruption/recovery and incompatibility are separate conditions. A normal save also rejects an incompatible primary file.
 
-## JSON backups
+## JSON backup
 
-Pouch exports the current JSON backup schema as version 5. It includes the country preference and expected income entries. Import accepts supported schema versions 1 through 5, validates all values, and builds a complete state before it is saved. Older backups retain their existing currency, language, calendar, and week start; their country is set to manual and they have no expected income entries. Unsupported, oversized, or invalid JSON is rejected without replacing the active data. The import limit is 5,000,000 bytes.
+Portable backups export version **9** and accept versions **8** and **9**, with a `version` and complete `state`. Version 8 upgrades add period metadata without resetting records. PeriodContext contains generated names and explicit income/expected-income and expense/goal associations keyed by stable record IDs. Backups include preferences, explicit periods, dated period plans, savings allocations, essential rules and payment links, received and expected income, receipt metadata, purchases, planned expenses/goals, and economic customizations. The limit is 5,000,000 bytes. JSON dates are ISO Gregorian strings, including daily-record keys.
 
-Money values are stored as integers in the smallest supported unit. Dates in persisted records use ISO Gregorian values; the selected calendar is used for display and entry. English and Persian interfaces share these same stored values. Expected income does not affect budget calculations until it is marked received and moved into recorded income.
+Import parses and validates all state before replacement. Unsupported, oversized, invalid, or inconsistent backups leave active state unchanged. Backups contain private financial records.
 
-## Restore and recovery
+## Periods and rollover
 
-Restore validates the selected document before replacing active state. If a primary write fails, the in-memory state stays unchanged. A separate recovery copy is available from the app's backup controls when the primary state cannot be read.
+Each persisted `BudgetPeriod` contains a stable unique ID, inclusive `start`, exclusive `end`, planning preset (`recurrence`), and original `calendar`. Presets only suggest horizons; they never create financial records or further periods. A fresh state contains no period. At most 1000 periods are supported, with each horizon spanning at most 3660 days. Historical adjacent periods meet at a shared boundary; the last period can expire until the user edits its horizon or creates another period.
 
-Keep exported JSON files private. They may contain purchase descriptions, amounts, income, planned expenses, savings goals, and preferences.
+Income can explicitly belong to a period independently of its receipt date; expected income uses the same association. Expenses and goals can also have an explicit period independent of their due date. Purchases remain dated ledger records, and no financial record is copied between periods. Records without explicit associations keep their earlier date-based income or cross-period target behavior. Starting a new period closes the previous one at the new start. Boundary edits rebind dated plans and allocations atomically. Invalid ranges and orphaned plans/allocations are rejected. IDs and generated display names remain stable after date edits. Generated display names are unique within the saved state and do not replace internal reference IDs.
+
+Rollover is derived from the complete dated cash ledger, outstanding obligations, and savings allocations. Free surplus/deficit, protected savings, funded reservations, and unpaid obligations continue without synthetic income or double-counting. Essential rules retain their own calendar, recurrence, due dates, and stable occurrence IDs independently of budget duration.
+
+## Validation and payment links
+
+Plans reference a period ID and effective date. Savings allocations are signed dated adjustments referring to a period. Actual goal payments consume savings once. Essential occurrences link to one actual purchase when paid; deleting the purchase reopens the obligation. Reservations are not actual spending. Reports use the payment date when determining historical outstanding obligations.
+
+Expected receipts retain the original expected date and amount after actual confirmation. Actual amount/date can differ, and the user explicitly chooses the receipt's period action. Expected income never funds a daily allowance or protected balance.
+
+State validation checks formats, supported dates, unique IDs, period boundaries, references, recurrence, integer amounts, and payment links before persistence. Failed mutations leave active state and revision unchanged. Current-format recovery export and single-step undo remain supported.

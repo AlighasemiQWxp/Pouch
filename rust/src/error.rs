@@ -4,6 +4,16 @@ pub type PouchResult<T> = Result<T, PouchError>;
 
 #[derive(Debug, Error)]
 pub enum PouchError {
+    #[error("Choose a planning horizon for this date.")]
+    MissingPeriod,
+    #[error("A period already starts on this date. Add income to that period.")]
+    PeriodAlreadyStarts,
+    #[error("These dates would leave saved plans or savings outside a period.")]
+    PeriodContainsPlan,
+    #[error("Budget periods must have valid, non-overlapping boundaries.")]
+    InvalidPeriod,
+    #[error("Choose a page starting at 1 and a page size between 1 and 100.")]
+    InvalidPagination,
     #[error("The amount is invalid or outside the supported range.")]
     InvalidAmount,
     #[error("The date or calendar preference is invalid.")]
@@ -18,7 +28,9 @@ pub enum PouchError {
     NoRecoveryCopy,
     #[error("Backup data exceeds the supported size.")]
     BackupTooLarge,
-    #[error("This storage format version is newer than this application supports.")]
+    #[error(
+        "This development data format is incompatible. Reset local data to start a new budget."
+    )]
     UnsupportedStorageVersion,
     #[error("The saved application data could not be read or recovered.")]
     StorageUnavailable,

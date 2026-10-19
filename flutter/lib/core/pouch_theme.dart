@@ -146,6 +146,71 @@ ThemeData buildPouchTheme([String style = 'classic']) {
   );
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Vazirmatn',
+    fontFamilyFallback: const ['sans-serif'],
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: palette.surface,
+      indicatorColor: palette.selection,
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(
+          fontFamily: 'Vazirmatn',
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: palette.ink,
+        ),
+      ),
+    ),
+    expansionTileTheme: ExpansionTileThemeData(
+      shape: const Border(),
+      collapsedShape: const Border(),
+      iconColor: palette.goldDeep,
+      collapsedIconColor: palette.muted,
+      childrenPadding: const EdgeInsets.only(bottom: 12),
+    ),
+    dividerTheme: DividerThemeData(color: palette.border, thickness: 1),
+    visualDensity: VisualDensity.standard,
+    textTheme: const TextTheme(
+      headlineLarge: TextStyle(
+        fontSize: 30,
+        fontWeight: FontWeight.w700,
+        height: 1.45,
+      ),
+      headlineMedium: TextStyle(
+        fontSize: 26,
+        fontWeight: FontWeight.w700,
+        height: 1.45,
+      ),
+      titleLarge: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+      bodyLarge: TextStyle(fontSize: 16, height: 1.55),
+      bodyMedium: TextStyle(fontSize: 14, height: 1.5),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: palette.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: palette.ink,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
     colorScheme: colors,
     extensions: [palette],
     scaffoldBackgroundColor: palette.cream,
@@ -160,7 +225,7 @@ ThemeData buildPouchTheme([String style = 'classic']) {
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         side: BorderSide(color: palette.border),
       ),
     ),

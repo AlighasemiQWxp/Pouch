@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -556070121;
+  int get rustContentHash => 1701825128;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -91,6 +91,7 @@ abstract class RustLibApi extends BaseApi {
   Future<BudgetSnapshot> crateApiPouchAppBudgetSummary({
     required PouchApp that,
     required String date,
+    String? periodId,
   });
 
   Future<void> crateApiPouchAppCacheEconomicProfile({
@@ -147,6 +148,7 @@ abstract class RustLibApi extends BaseApi {
     required String selectedId,
     required bool recommended,
     required bool incomeRequired,
+    String? periodId,
   });
 
   Future<List<GoalForecastSnapshot>> crateApiPouchAppGoalForecast({
@@ -157,12 +159,6 @@ abstract class RustLibApi extends BaseApi {
   Future<AppSnapshot> crateApiPouchAppImportBackup({
     required PouchApp that,
     required String contents,
-  });
-
-  Future<AppSnapshot> crateApiPouchAppMarkExpectedIncomeReceived({
-    required PouchApp that,
-    required String id,
-    required String receivedDate,
   });
 
   Future<AppSnapshot> crateApiPouchAppMarkPlannedPaid({
@@ -178,11 +174,14 @@ abstract class RustLibApi extends BaseApi {
     required List<String> legacyJsonCandidates,
   });
 
-  Future<AppSnapshot> crateApiPouchAppRecordIncome({
+  Future<PeriodViewSnapshot> crateApiPouchAppPeriodView({
     required PouchApp that,
-    required String id,
     required String date,
-    required String amount,
+  });
+
+  Future<AppSnapshot> crateApiPouchAppReceiveIncome({
+    required PouchApp that,
+    required ReceiveIncomeRequest receipt,
   });
 
   Future<AppSnapshot> crateApiPouchAppRemoveBudgetPlan({
@@ -196,6 +195,11 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<AppSnapshot> crateApiPouchAppRemoveIncome({
+    required PouchApp that,
+    required String id,
+  });
+
+  Future<AppSnapshot> crateApiPouchAppRemovePeriod({
     required PouchApp that,
     required String id,
   });
@@ -243,14 +247,28 @@ abstract class RustLibApi extends BaseApi {
 
   Future<AppSnapshot> crateApiPouchAppSaveBudgetPlan({
     required PouchApp that,
+    required String periodId,
     required String effective,
-    String? salary,
-    required String dailyBudget,
-    required List<String> expenseIds,
-    required List<String> expenseNames,
-    required List<String> expenseAmounts,
     required String savings,
-    required int payday,
+  });
+
+  Future<AppSnapshot> crateApiPouchAppSaveEssentialExpense({
+    required PouchApp that,
+    required String id,
+    required String name,
+    required String amount,
+    required String date,
+    required String kind,
+    required int customDays,
+  });
+
+  Future<AppSnapshot> crateApiPouchAppSavePeriod({
+    required PouchApp that,
+    String? id,
+    required String start,
+    required String kind,
+    required int customDays,
+    String? through,
   });
 
   Future<AppSnapshot> crateApiPouchAppSavePlanned({
@@ -261,6 +279,7 @@ abstract class RustLibApi extends BaseApi {
     required String category,
     required String kind,
     required String date,
+    String? periodId,
   });
 
   Future<AppSnapshot> crateApiPouchAppScheduleIncome({
@@ -268,12 +287,7 @@ abstract class RustLibApi extends BaseApi {
     required String id,
     required String date,
     required String amount,
-  });
-
-  Future<AppSnapshot> crateApiPouchAppSetDailyOverride({
-    required PouchApp that,
-    required String date,
-    String? amount,
+    String? periodId,
   });
 
   Future<AppSnapshot> crateApiPouchAppSnapshot({required PouchApp that});
@@ -285,6 +299,12 @@ abstract class RustLibApi extends BaseApi {
     required String country,
   });
 
+  Future<AppSnapshot> crateApiPouchAppStopEssentialExpense({
+    required PouchApp that,
+    required String id,
+    required String date,
+  });
+
   Future<String> crateApiPouchAppToday({required PouchApp that});
 
   Future<AppSnapshot> crateApiPouchAppUndoLastChange({required PouchApp that});
@@ -294,6 +314,7 @@ abstract class RustLibApi extends BaseApi {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   });
 
   Future<AppSnapshot> crateApiPouchAppUpdateIncome({
@@ -301,6 +322,7 @@ abstract class RustLibApi extends BaseApi {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   });
 
   Future<AppSnapshot> crateApiPouchAppUpdatePreferences({
@@ -318,6 +340,10 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<String> crateApiEconomicCountries();
+
+  Future<void> crateApiResetIncompatibleStorage({
+    required String applicationDataDirectory,
+  });
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_PouchApp;
@@ -386,6 +412,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<BudgetSnapshot> crateApiPouchAppBudgetSummary({
     required PouchApp that,
     required String date,
+    String? periodId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -396,6 +423,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(date, serializer);
+          sse_encode_opt_String(periodId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -408,7 +436,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppBudgetSummaryConstMeta,
-        argValues: [that, date],
+        argValues: [that, date, periodId],
         apiImpl: this,
       ),
     );
@@ -417,7 +445,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPouchAppBudgetSummaryConstMeta =>
       const TaskConstMeta(
         debugName: "PouchApp_budget_summary",
-        argNames: ["that", "date"],
+        argNames: ["that", "date", "periodId"],
       );
 
   @override
@@ -766,6 +794,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String selectedId,
     required bool recommended,
     required bool incomeRequired,
+    String? periodId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -779,6 +808,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(selectedId, serializer);
           sse_encode_bool(recommended, serializer);
           sse_encode_bool(incomeRequired, serializer);
+          sse_encode_opt_String(periodId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -791,7 +821,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppFinancialForecastConstMeta,
-        argValues: [that, asOf, selectedId, recommended, incomeRequired],
+        argValues: [
+          that,
+          asOf,
+          selectedId,
+          recommended,
+          incomeRequired,
+          periodId,
+        ],
         apiImpl: this,
       ),
     );
@@ -806,6 +843,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "selectedId",
           "recommended",
           "incomeRequired",
+          "periodId",
         ],
       );
 
@@ -886,46 +924,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<AppSnapshot> crateApiPouchAppMarkExpectedIncomeReceived({
-    required PouchApp that,
-    required String id,
-    required String receivedDate,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
-            that,
-            serializer,
-          );
-          sse_encode_String(id, serializer);
-          sse_encode_String(receivedDate, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 14,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_app_snapshot,
-          decodeErrorData: sse_decode_String,
-        ),
-        constMeta: kCrateApiPouchAppMarkExpectedIncomeReceivedConstMeta,
-        argValues: [that, id, receivedDate],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPouchAppMarkExpectedIncomeReceivedConstMeta =>
-      const TaskConstMeta(
-        debugName: "PouchApp_mark_expected_income_received",
-        argNames: ["that", "id", "receivedDate"],
-      );
-
-  @override
   Future<AppSnapshot> crateApiPouchAppMarkPlannedPaid({
     required PouchApp that,
     required String planId,
@@ -948,7 +946,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 14,
             port: port_,
           );
         },
@@ -983,7 +981,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 15,
             port: port_,
           );
         },
@@ -1005,11 +1003,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<AppSnapshot> crateApiPouchAppRecordIncome({
+  Future<PeriodViewSnapshot> crateApiPouchAppPeriodView({
     required PouchApp that,
-    required String id,
     required String date,
-    required String amount,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(date, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_period_view_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPouchAppPeriodViewConstMeta,
+        argValues: [that, date],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPouchAppPeriodViewConstMeta => const TaskConstMeta(
+    debugName: "PouchApp_period_view",
+    argNames: ["that", "date"],
+  );
+
+  @override
+  Future<AppSnapshot> crateApiPouchAppReceiveIncome({
+    required PouchApp that,
+    required ReceiveIncomeRequest receipt,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1019,9 +1052,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          sse_encode_String(id, serializer);
-          sse_encode_String(date, serializer);
-          sse_encode_String(amount, serializer);
+          sse_encode_box_autoadd_receive_income_request(receipt, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1033,17 +1064,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_app_snapshot,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiPouchAppRecordIncomeConstMeta,
-        argValues: [that, id, date, amount],
+        constMeta: kCrateApiPouchAppReceiveIncomeConstMeta,
+        argValues: [that, receipt],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiPouchAppRecordIncomeConstMeta =>
+  TaskConstMeta get kCrateApiPouchAppReceiveIncomeConstMeta =>
       const TaskConstMeta(
-        debugName: "PouchApp_record_income",
-        argNames: ["that", "id", "date", "amount"],
+        debugName: "PouchApp_receive_income",
+        argNames: ["that", "receipt"],
       );
 
   @override
@@ -1161,7 +1192,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<AppSnapshot> crateApiPouchAppRemovePlanned({
+  Future<AppSnapshot> crateApiPouchAppRemovePeriod({
     required PouchApp that,
     required String id,
   }) {
@@ -1178,6 +1209,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_app_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPouchAppRemovePeriodConstMeta,
+        argValues: [that, id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPouchAppRemovePeriodConstMeta =>
+      const TaskConstMeta(
+        debugName: "PouchApp_remove_period",
+        argNames: ["that", "id"],
+      );
+
+  @override
+  Future<AppSnapshot> crateApiPouchAppRemovePlanned({
+    required PouchApp that,
+    required String id,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1217,7 +1286,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1257,7 +1326,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1297,7 +1366,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1335,7 +1404,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1375,7 +1444,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1408,7 +1477,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1443,7 +1512,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1467,14 +1536,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<AppSnapshot> crateApiPouchAppSaveBudgetPlan({
     required PouchApp that,
+    required String periodId,
     required String effective,
-    String? salary,
-    required String dailyBudget,
-    required List<String> expenseIds,
-    required List<String> expenseNames,
-    required List<String> expenseAmounts,
     required String savings,
-    required int payday,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1484,18 +1548,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
+          sse_encode_String(periodId, serializer);
           sse_encode_String(effective, serializer);
-          sse_encode_opt_String(salary, serializer);
-          sse_encode_String(dailyBudget, serializer);
-          sse_encode_list_String(expenseIds, serializer);
-          sse_encode_list_String(expenseNames, serializer);
-          sse_encode_list_String(expenseAmounts, serializer);
           sse_encode_String(savings, serializer);
-          sse_encode_u_8(payday, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1504,17 +1563,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppSaveBudgetPlanConstMeta,
-        argValues: [
-          that,
-          effective,
-          salary,
-          dailyBudget,
-          expenseIds,
-          expenseNames,
-          expenseAmounts,
-          savings,
-          payday,
-        ],
+        argValues: [that, periodId, effective, savings],
         apiImpl: this,
       ),
     );
@@ -1523,18 +1572,109 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPouchAppSaveBudgetPlanConstMeta =>
       const TaskConstMeta(
         debugName: "PouchApp_save_budget_plan",
+        argNames: ["that", "periodId", "effective", "savings"],
+      );
+
+  @override
+  Future<AppSnapshot> crateApiPouchAppSaveEssentialExpense({
+    required PouchApp that,
+    required String id,
+    required String name,
+    required String amount,
+    required String date,
+    required String kind,
+    required int customDays,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(id, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_String(amount, serializer);
+          sse_encode_String(date, serializer);
+          sse_encode_String(kind, serializer);
+          sse_encode_u_16(customDays, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 31,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_app_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPouchAppSaveEssentialExpenseConstMeta,
+        argValues: [that, id, name, amount, date, kind, customDays],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPouchAppSaveEssentialExpenseConstMeta =>
+      const TaskConstMeta(
+        debugName: "PouchApp_save_essential_expense",
         argNames: [
           "that",
-          "effective",
-          "salary",
-          "dailyBudget",
-          "expenseIds",
-          "expenseNames",
-          "expenseAmounts",
-          "savings",
-          "payday",
+          "id",
+          "name",
+          "amount",
+          "date",
+          "kind",
+          "customDays",
         ],
       );
+
+  @override
+  Future<AppSnapshot> crateApiPouchAppSavePeriod({
+    required PouchApp that,
+    String? id,
+    required String start,
+    required String kind,
+    required int customDays,
+    String? through,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
+            that,
+            serializer,
+          );
+          sse_encode_opt_String(id, serializer);
+          sse_encode_String(start, serializer);
+          sse_encode_String(kind, serializer);
+          sse_encode_u_16(customDays, serializer);
+          sse_encode_opt_String(through, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_app_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPouchAppSavePeriodConstMeta,
+        argValues: [that, id, start, kind, customDays, through],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPouchAppSavePeriodConstMeta => const TaskConstMeta(
+    debugName: "PouchApp_save_period",
+    argNames: ["that", "id", "start", "kind", "customDays", "through"],
+  );
 
   @override
   Future<AppSnapshot> crateApiPouchAppSavePlanned({
@@ -1545,6 +1685,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String category,
     required String kind,
     required String date,
+    String? periodId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1560,10 +1701,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(category, serializer);
           sse_encode_String(kind, serializer);
           sse_encode_String(date, serializer);
+          sse_encode_opt_String(periodId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1572,7 +1714,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppSavePlannedConstMeta,
-        argValues: [that, id, description, amount, category, kind, date],
+        argValues: [
+          that,
+          id,
+          description,
+          amount,
+          category,
+          kind,
+          date,
+          periodId,
+        ],
         apiImpl: this,
       ),
     );
@@ -1589,6 +1740,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "category",
           "kind",
           "date",
+          "periodId",
         ],
       );
 
@@ -1598,6 +1750,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1610,10 +1763,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(id, serializer);
           sse_encode_String(date, serializer);
           sse_encode_String(amount, serializer);
+          sse_encode_opt_String(periodId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1622,7 +1776,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppScheduleIncomeConstMeta,
-        argValues: [that, id, date, amount],
+        argValues: [that, id, date, amount, periodId],
         apiImpl: this,
       ),
     );
@@ -1631,47 +1785,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPouchAppScheduleIncomeConstMeta =>
       const TaskConstMeta(
         debugName: "PouchApp_schedule_income",
-        argNames: ["that", "id", "date", "amount"],
-      );
-
-  @override
-  Future<AppSnapshot> crateApiPouchAppSetDailyOverride({
-    required PouchApp that,
-    required String date,
-    String? amount,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
-            that,
-            serializer,
-          );
-          sse_encode_String(date, serializer);
-          sse_encode_opt_String(amount, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 32,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_app_snapshot,
-          decodeErrorData: sse_decode_String,
-        ),
-        constMeta: kCrateApiPouchAppSetDailyOverrideConstMeta,
-        argValues: [that, date, amount],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiPouchAppSetDailyOverrideConstMeta =>
-      const TaskConstMeta(
-        debugName: "PouchApp_set_daily_override",
-        argNames: ["that", "date", "amount"],
+        argNames: ["that", "id", "date", "amount", "periodId"],
       );
 
   @override
@@ -1687,7 +1801,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1726,7 +1840,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1748,6 +1862,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<AppSnapshot> crateApiPouchAppStopEssentialExpense({
+    required PouchApp that,
+    required String id,
+    required String date,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPouchApp(
+            that,
+            serializer,
+          );
+          sse_encode_String(id, serializer);
+          sse_encode_String(date, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 37,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_app_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiPouchAppStopEssentialExpenseConstMeta,
+        argValues: [that, id, date],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPouchAppStopEssentialExpenseConstMeta =>
+      const TaskConstMeta(
+        debugName: "PouchApp_stop_essential_expense",
+        argNames: ["that", "id", "date"],
+      );
+
+  @override
   Future<String> crateApiPouchAppToday({required PouchApp that}) {
     return handler.executeNormal(
       NormalTask(
@@ -1760,7 +1914,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1791,7 +1945,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1818,6 +1972,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1830,10 +1985,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(id, serializer);
           sse_encode_String(date, serializer);
           sse_encode_String(amount, serializer);
+          sse_encode_opt_String(periodId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1842,7 +1998,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppUpdateExpectedIncomeConstMeta,
-        argValues: [that, id, date, amount],
+        argValues: [that, id, date, amount, periodId],
         apiImpl: this,
       ),
     );
@@ -1851,7 +2007,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPouchAppUpdateExpectedIncomeConstMeta =>
       const TaskConstMeta(
         debugName: "PouchApp_update_expected_income",
-        argNames: ["that", "id", "date", "amount"],
+        argNames: ["that", "id", "date", "amount", "periodId"],
       );
 
   @override
@@ -1860,6 +2016,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1872,10 +2029,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(id, serializer);
           sse_encode_String(date, serializer);
           sse_encode_String(amount, serializer);
+          sse_encode_opt_String(periodId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1884,7 +2042,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiPouchAppUpdateIncomeConstMeta,
-        argValues: [that, id, date, amount],
+        argValues: [that, id, date, amount, periodId],
         apiImpl: this,
       ),
     );
@@ -1893,7 +2051,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiPouchAppUpdateIncomeConstMeta =>
       const TaskConstMeta(
         debugName: "PouchApp_update_income",
-        argNames: ["that", "id", "date", "amount"],
+        argNames: ["that", "id", "date", "amount", "periodId"],
       );
 
   @override
@@ -1921,7 +2079,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1963,7 +2121,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1993,7 +2151,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 44,
             port: port_,
           );
         },
@@ -2010,6 +2168,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiEconomicCountriesConstMeta =>
       const TaskConstMeta(debugName: "economic_countries", argNames: []);
+
+  @override
+  Future<void> crateApiResetIncompatibleStorage({
+    required String applicationDataDirectory,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(applicationDataDirectory, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 45,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiResetIncompatibleStorageConstMeta,
+        argValues: [applicationDataDirectory],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiResetIncompatibleStorageConstMeta =>
+      const TaskConstMeta(
+        debugName: "reset_incompatible_storage",
+        argNames: ["applicationDataDirectory"],
+      );
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_PouchApp => wire
@@ -2081,8 +2272,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AppSnapshot dco_decode_app_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 10)
-      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    if (arr.length != 15)
+      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
     return AppSnapshot(
       revision: dco_decode_CastedPrimitive_u_64(arr[0]),
       recovered: dco_decode_bool(arr[1]),
@@ -2092,8 +2283,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       income: dco_decode_list_income_snapshot(arr[5]),
       expectedIncome: dco_decode_list_expected_income_snapshot(arr[6]),
       plans: dco_decode_list_budget_plan_snapshot(arr[7]),
-      days: dco_decode_list_day_snapshot(arr[8]),
-      planned: dco_decode_list_planned_snapshot(arr[9]),
+      currentPlan: dco_decode_budget_plan_snapshot(arr[8]),
+      currentPeriod: dco_decode_opt_box_autoadd_period_snapshot(arr[9]),
+      periods: dco_decode_list_period_snapshot(arr[10]),
+      essentials: dco_decode_list_required_expense_snapshot(arr[11]),
+      incomeDays: dco_decode_list_income_day_snapshot(arr[12]),
+      days: dco_decode_list_day_snapshot(arr[13]),
+      planned: dco_decode_list_planned_snapshot(arr[14]),
     );
   }
 
@@ -2110,20 +2306,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PeriodSnapshot dco_decode_box_autoadd_period_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_period_snapshot(raw);
+  }
+
+  @protected
+  ReceiveIncomeRequest dco_decode_box_autoadd_receive_income_request(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_receive_income_request(raw);
+  }
+
+  @protected
   BudgetPlanSnapshot dco_decode_budget_plan_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return BudgetPlanSnapshot(
-      effective: dco_decode_String(arr[0]),
-      salary: dco_decode_opt_CastedPrimitive_i_64(arr[1]),
-      dailyBudget: dco_decode_CastedPrimitive_i_64(arr[2]),
-      expenses: dco_decode_list_required_expense_snapshot(arr[3]),
-      savings: dco_decode_CastedPrimitive_i_64(arr[4]),
-      payday: dco_decode_u_8(arr[5]),
-      calendar: dco_decode_String(arr[6]),
-      legacy: dco_decode_bool(arr[7]),
+      periodId: dco_decode_String(arr[0]),
+      effective: dco_decode_String(arr[1]),
+      savings: dco_decode_CastedPrimitive_i_64(arr[2]),
     );
   }
 
@@ -2131,8 +2336,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BudgetSnapshot dco_decode_budget_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 14)
-      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    if (arr.length != 15)
+      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
     return BudgetSnapshot(
       date: dco_decode_String(arr[0]),
       periodEnd: dco_decode_String(arr[1]),
@@ -2146,8 +2351,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       savings: dco_decode_CastedPrimitive_i_64(arr[9]),
       funds: dco_decode_CastedPrimitive_i_64(arr[10]),
       reserved: dco_decode_CastedPrimitive_i_64(arr[11]),
-      recommendation: dco_decode_CastedPrimitive_i_64(arr[12]),
-      shortfall: dco_decode_CastedPrimitive_i_64(arr[13]),
+      fundedExpenses: dco_decode_CastedPrimitive_i_64(arr[12]),
+      recommendation: dco_decode_CastedPrimitive_i_64(arr[13]),
+      shortfall: dco_decode_CastedPrimitive_i_64(arr[14]),
     );
   }
 
@@ -2207,12 +2413,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   DaySnapshot dco_decode_day_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return DaySnapshot(
       date: dco_decode_String(arr[0]),
-      budget: dco_decode_opt_CastedPrimitive_i_64(arr[1]),
-      purchases: dco_decode_list_purchase_snapshot(arr[2]),
+      purchases: dco_decode_list_purchase_snapshot(arr[1]),
     );
   }
 
@@ -2220,12 +2425,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ExpectedIncomeSnapshot dco_decode_expected_income_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return ExpectedIncomeSnapshot(
-      id: dco_decode_String(arr[0]),
-      date: dco_decode_String(arr[1]),
-      amount: dco_decode_CastedPrimitive_i_64(arr[2]),
+      periodId: dco_decode_opt_String(arr[0]),
+      id: dco_decode_String(arr[1]),
+      date: dco_decode_String(arr[2]),
+      amount: dco_decode_CastedPrimitive_i_64(arr[3]),
     );
   }
 
@@ -2244,11 +2450,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       extraDays: dco_decode_opt_box_autoadd_i_32(arr[3]),
       fasterDays: dco_decode_opt_box_autoadd_i_32(arr[4]),
       contribution: dco_decode_CastedPrimitive_i_64(arr[5]),
-      monthlyIncome: dco_decode_CastedPrimitive_i_64(arr[6]),
+      periodIncome: dco_decode_CastedPrimitive_i_64(arr[6]),
       dailyAllowance: dco_decode_CastedPrimitive_i_64(arr[7]),
       requiredIncome: dco_decode_opt_CastedPrimitive_i_64(arr[8]),
       dailyLimit: dco_decode_CastedPrimitive_i_64(arr[9]),
-      monthlySaving: dco_decode_opt_CastedPrimitive_i_64(arr[10]),
+      periodSaving: dco_decode_opt_CastedPrimitive_i_64(arr[10]),
       incomeGap: dco_decode_opt_CastedPrimitive_i_64(arr[11]),
       spendingReduction: dco_decode_CastedPrimitive_i_64(arr[12]),
       allocated: dco_decode_CastedPrimitive_i_64(arr[13]),
@@ -2270,7 +2476,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return GoalForecastSnapshot(
       id: dco_decode_String(arr[0]),
       periods: dco_decode_i_32(arr[1]),
-      requiredMonthly: dco_decode_opt_CastedPrimitive_i_64(arr[2]),
+      requiredPerPeriod: dco_decode_opt_CastedPrimitive_i_64(arr[2]),
       projected: dco_decode_CastedPrimitive_i_64(arr[3]),
       percent: dco_decode_i_32(arr[4]),
       difference: dco_decode_opt_CastedPrimitive_i_64(arr[5]),
@@ -2293,15 +2499,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  IncomeDaySnapshot dco_decode_income_day_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return IncomeDaySnapshot(
+      date: dco_decode_String(arr[0]),
+      received: dco_decode_CastedPrimitive_i_64(arr[1]),
+      expected: dco_decode_CastedPrimitive_i_64(arr[2]),
+      count: dco_decode_i_32(arr[3]),
+    );
+  }
+
+  @protected
   IncomeSnapshot dco_decode_income_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return IncomeSnapshot(
-      id: dco_decode_String(arr[0]),
-      date: dco_decode_String(arr[1]),
-      amount: dco_decode_CastedPrimitive_i_64(arr[2]),
+      periodId: dco_decode_opt_String(arr[0]),
+      id: dco_decode_String(arr[1]),
+      date: dco_decode_String(arr[2]),
+      amount: dco_decode_CastedPrimitive_i_64(arr[3]),
     );
   }
 
@@ -2360,9 +2581,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<IncomeDaySnapshot> dco_decode_list_income_day_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_income_day_snapshot).toList();
+  }
+
+  @protected
   List<IncomeSnapshot> dco_decode_list_income_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_income_snapshot).toList();
+  }
+
+  @protected
+  List<PeriodSnapshot> dco_decode_list_period_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_period_snapshot).toList();
   }
 
   @protected
@@ -2430,6 +2663,60 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PeriodSnapshot? dco_decode_opt_box_autoadd_period_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_period_snapshot(raw);
+  }
+
+  @protected
+  PeriodSnapshot dco_decode_period_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 20)
+      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
+    return PeriodSnapshot(
+      name: dco_decode_String(arr[0]),
+      id: dco_decode_String(arr[1]),
+      start: dco_decode_String(arr[2]),
+      end: dco_decode_String(arr[3]),
+      previousDate: dco_decode_String(arr[4]),
+      changeFrom: dco_decode_String(arr[5]),
+      status: dco_decode_String(arr[6]),
+      income: dco_decode_CastedPrimitive_i_64(arr[7]),
+      expenses: dco_decode_CastedPrimitive_i_64(arr[8]),
+      savings: dco_decode_CastedPrimitive_i_64(arr[9]),
+      plannedSavings: dco_decode_CastedPrimitive_i_64(arr[10]),
+      contributedSavings: dco_decode_CastedPrimitive_i_64(arr[11]),
+      remaining: dco_decode_CastedPrimitive_i_64(arr[12]),
+      carry: dco_decode_CastedPrimitive_i_64(arr[13]),
+      reserved: dco_decode_CastedPrimitive_i_64(arr[14]),
+      fundedExpenses: dco_decode_CastedPrimitive_i_64(arr[15]),
+      nextDate: dco_decode_String(arr[16]),
+      recurrence: dco_decode_String(arr[17]),
+      customDays: dco_decode_u_16(arr[18]),
+      calendar: dco_decode_String(arr[19]),
+    );
+  }
+
+  @protected
+  PeriodViewSnapshot dco_decode_period_view_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return PeriodViewSnapshot(
+      period: dco_decode_period_snapshot(arr[0]),
+      plan: dco_decode_budget_plan_snapshot(arr[1]),
+      budget: dco_decode_budget_snapshot(arr[2]),
+      income: dco_decode_list_income_snapshot(arr[3]),
+      expectedIncome: dco_decode_list_expected_income_snapshot(arr[4]),
+      expectedTotal: dco_decode_CastedPrimitive_i_64(arr[5]),
+      targets: dco_decode_list_planned_snapshot(arr[6]),
+      obligations: dco_decode_list_planned_snapshot(arr[7]),
+    );
+  }
+
+  @protected
   PlannedReportSnapshot dco_decode_planned_report_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -2448,18 +2735,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PlannedSnapshot dco_decode_planned_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
     return PlannedSnapshot(
-      id: dco_decode_String(arr[0]),
-      description: dco_decode_String(arr[1]),
-      amount: dco_decode_CastedPrimitive_i_64(arr[2]),
-      category: dco_decode_String(arr[3]),
-      kind: dco_decode_String(arr[4]),
-      date: dco_decode_String(arr[5]),
-      status: dco_decode_String(arr[6]),
-      paidDate: dco_decode_opt_String(arr[7]),
-      purchaseId: dco_decode_opt_String(arr[8]),
+      periodId: dco_decode_opt_String(arr[0]),
+      id: dco_decode_String(arr[1]),
+      description: dco_decode_String(arr[2]),
+      amount: dco_decode_CastedPrimitive_i_64(arr[3]),
+      category: dco_decode_String(arr[4]),
+      kind: dco_decode_String(arr[5]),
+      date: dco_decode_String(arr[6]),
+      status: dco_decode_String(arr[7]),
+      paidDate: dco_decode_opt_String(arr[8]),
+      purchaseId: dco_decode_opt_String(arr[9]),
+      essentialId: dco_decode_opt_String(arr[10]),
     );
   }
 
@@ -2490,6 +2779,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       amount: dco_decode_CastedPrimitive_i_64(arr[2]),
       category: dco_decode_String(arr[3]),
       fundedByGoal: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
+  ReceiveIncomeRequest dco_decode_receive_income_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return ReceiveIncomeRequest(
+      id: dco_decode_String(arr[0]),
+      date: dco_decode_String(arr[1]),
+      amount: dco_decode_String(arr[2]),
+      periodId: dco_decode_opt_String(arr[3]),
+      startNew: dco_decode_bool(arr[4]),
+      kind: dco_decode_String(arr[5]),
+      customDays: dco_decode_u_16(arr[6]),
+      through: dco_decode_opt_String(arr[7]),
+      expected: dco_decode_bool(arr[8]),
     );
   }
 
@@ -2530,13 +2838,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RequiredExpenseSnapshot dco_decode_required_expense_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return RequiredExpenseSnapshot(
       id: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
       amount: dco_decode_CastedPrimitive_i_64(arr[2]),
+      date: dco_decode_String(arr[3]),
+      recurrence: dco_decode_String(arr[4]),
+      customDays: dco_decode_u_16(arr[5]),
+      until: dco_decode_opt_String(arr[6]),
     );
+  }
+
+  @protected
+  int dco_decode_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -2645,6 +2963,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       deserializer,
     );
     var var_plans = sse_decode_list_budget_plan_snapshot(deserializer);
+    var var_currentPlan = sse_decode_budget_plan_snapshot(deserializer);
+    var var_currentPeriod = sse_decode_opt_box_autoadd_period_snapshot(
+      deserializer,
+    );
+    var var_periods = sse_decode_list_period_snapshot(deserializer);
+    var var_essentials = sse_decode_list_required_expense_snapshot(
+      deserializer,
+    );
+    var var_incomeDays = sse_decode_list_income_day_snapshot(deserializer);
     var var_days = sse_decode_list_day_snapshot(deserializer);
     var var_planned = sse_decode_list_planned_snapshot(deserializer);
     return AppSnapshot(
@@ -2656,6 +2983,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       income: var_income,
       expectedIncome: var_expectedIncome,
       plans: var_plans,
+      currentPlan: var_currentPlan,
+      currentPeriod: var_currentPeriod,
+      periods: var_periods,
+      essentials: var_essentials,
+      incomeDays: var_incomeDays,
       days: var_days,
       planned: var_planned,
     );
@@ -2674,27 +3006,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PeriodSnapshot sse_decode_box_autoadd_period_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_period_snapshot(deserializer));
+  }
+
+  @protected
+  ReceiveIncomeRequest sse_decode_box_autoadd_receive_income_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_receive_income_request(deserializer));
+  }
+
+  @protected
   BudgetPlanSnapshot sse_decode_budget_plan_snapshot(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_periodId = sse_decode_String(deserializer);
     var var_effective = sse_decode_String(deserializer);
-    var var_salary = sse_decode_opt_CastedPrimitive_i_64(deserializer);
-    var var_dailyBudget = sse_decode_CastedPrimitive_i_64(deserializer);
-    var var_expenses = sse_decode_list_required_expense_snapshot(deserializer);
     var var_savings = sse_decode_CastedPrimitive_i_64(deserializer);
-    var var_payday = sse_decode_u_8(deserializer);
-    var var_calendar = sse_decode_String(deserializer);
-    var var_legacy = sse_decode_bool(deserializer);
     return BudgetPlanSnapshot(
+      periodId: var_periodId,
       effective: var_effective,
-      salary: var_salary,
-      dailyBudget: var_dailyBudget,
-      expenses: var_expenses,
       savings: var_savings,
-      payday: var_payday,
-      calendar: var_calendar,
-      legacy: var_legacy,
     );
   }
 
@@ -2713,6 +3051,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_savings = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_funds = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_reserved = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_fundedExpenses = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_recommendation = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_shortfall = sse_decode_CastedPrimitive_i_64(deserializer);
     return BudgetSnapshot(
@@ -2728,6 +3067,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       savings: var_savings,
       funds: var_funds,
       reserved: var_reserved,
+      fundedExpenses: var_fundedExpenses,
       recommendation: var_recommendation,
       shortfall: var_shortfall,
     );
@@ -2787,13 +3127,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   DaySnapshot sse_decode_day_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_date = sse_decode_String(deserializer);
-    var var_budget = sse_decode_opt_CastedPrimitive_i_64(deserializer);
     var var_purchases = sse_decode_list_purchase_snapshot(deserializer);
-    return DaySnapshot(
-      date: var_date,
-      budget: var_budget,
-      purchases: var_purchases,
-    );
+    return DaySnapshot(date: var_date, purchases: var_purchases);
   }
 
   @protected
@@ -2801,10 +3136,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_periodId = sse_decode_opt_String(deserializer);
     var var_id = sse_decode_String(deserializer);
     var var_date = sse_decode_String(deserializer);
     var var_amount = sse_decode_CastedPrimitive_i_64(deserializer);
     return ExpectedIncomeSnapshot(
+      periodId: var_periodId,
       id: var_id,
       date: var_date,
       amount: var_amount,
@@ -2824,11 +3161,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_extraDays = sse_decode_opt_box_autoadd_i_32(deserializer);
     var var_fasterDays = sse_decode_opt_box_autoadd_i_32(deserializer);
     var var_contribution = sse_decode_CastedPrimitive_i_64(deserializer);
-    var var_monthlyIncome = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_periodIncome = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_dailyAllowance = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_requiredIncome = sse_decode_opt_CastedPrimitive_i_64(deserializer);
     var var_dailyLimit = sse_decode_CastedPrimitive_i_64(deserializer);
-    var var_monthlySaving = sse_decode_opt_CastedPrimitive_i_64(deserializer);
+    var var_periodSaving = sse_decode_opt_CastedPrimitive_i_64(deserializer);
     var var_incomeGap = sse_decode_opt_CastedPrimitive_i_64(deserializer);
     var var_spendingReduction = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_allocated = sse_decode_CastedPrimitive_i_64(deserializer);
@@ -2845,11 +3182,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       extraDays: var_extraDays,
       fasterDays: var_fasterDays,
       contribution: var_contribution,
-      monthlyIncome: var_monthlyIncome,
+      periodIncome: var_periodIncome,
       dailyAllowance: var_dailyAllowance,
       requiredIncome: var_requiredIncome,
       dailyLimit: var_dailyLimit,
-      monthlySaving: var_monthlySaving,
+      periodSaving: var_periodSaving,
       incomeGap: var_incomeGap,
       spendingReduction: var_spendingReduction,
       allocated: var_allocated,
@@ -2869,7 +3206,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
     var var_periods = sse_decode_i_32(deserializer);
-    var var_requiredMonthly = sse_decode_opt_CastedPrimitive_i_64(deserializer);
+    var var_requiredPerPeriod = sse_decode_opt_CastedPrimitive_i_64(
+      deserializer,
+    );
     var var_projected = sse_decode_CastedPrimitive_i_64(deserializer);
     var var_percent = sse_decode_i_32(deserializer);
     var var_difference = sse_decode_opt_CastedPrimitive_i_64(deserializer);
@@ -2879,7 +3218,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return GoalForecastSnapshot(
       id: var_id,
       periods: var_periods,
-      requiredMonthly: var_requiredMonthly,
+      requiredPerPeriod: var_requiredPerPeriod,
       projected: var_projected,
       percent: var_percent,
       difference: var_difference,
@@ -2902,12 +3241,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  IncomeDaySnapshot sse_decode_income_day_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_date = sse_decode_String(deserializer);
+    var var_received = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_expected = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_count = sse_decode_i_32(deserializer);
+    return IncomeDaySnapshot(
+      date: var_date,
+      received: var_received,
+      expected: var_expected,
+      count: var_count,
+    );
+  }
+
+  @protected
   IncomeSnapshot sse_decode_income_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_periodId = sse_decode_opt_String(deserializer);
     var var_id = sse_decode_String(deserializer);
     var var_date = sse_decode_String(deserializer);
     var var_amount = sse_decode_CastedPrimitive_i_64(deserializer);
-    return IncomeSnapshot(id: var_id, date: var_date, amount: var_amount);
+    return IncomeSnapshot(
+      periodId: var_periodId,
+      id: var_id,
+      date: var_date,
+      amount: var_amount,
+    );
   }
 
   @protected
@@ -3005,6 +3367,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<IncomeDaySnapshot> sse_decode_list_income_day_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <IncomeDaySnapshot>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_income_day_snapshot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<IncomeSnapshot> sse_decode_list_income_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -3014,6 +3390,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <IncomeSnapshot>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_income_snapshot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PeriodSnapshot> sse_decode_list_period_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PeriodSnapshot>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_period_snapshot(deserializer));
     }
     return ans_;
   }
@@ -3129,6 +3519,93 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PeriodSnapshot? sse_decode_opt_box_autoadd_period_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_period_snapshot(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  PeriodSnapshot sse_decode_period_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_id = sse_decode_String(deserializer);
+    var var_start = sse_decode_String(deserializer);
+    var var_end = sse_decode_String(deserializer);
+    var var_previousDate = sse_decode_String(deserializer);
+    var var_changeFrom = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_income = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_expenses = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_savings = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_plannedSavings = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_contributedSavings = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_remaining = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_carry = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_reserved = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_fundedExpenses = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_nextDate = sse_decode_String(deserializer);
+    var var_recurrence = sse_decode_String(deserializer);
+    var var_customDays = sse_decode_u_16(deserializer);
+    var var_calendar = sse_decode_String(deserializer);
+    return PeriodSnapshot(
+      name: var_name,
+      id: var_id,
+      start: var_start,
+      end: var_end,
+      previousDate: var_previousDate,
+      changeFrom: var_changeFrom,
+      status: var_status,
+      income: var_income,
+      expenses: var_expenses,
+      savings: var_savings,
+      plannedSavings: var_plannedSavings,
+      contributedSavings: var_contributedSavings,
+      remaining: var_remaining,
+      carry: var_carry,
+      reserved: var_reserved,
+      fundedExpenses: var_fundedExpenses,
+      nextDate: var_nextDate,
+      recurrence: var_recurrence,
+      customDays: var_customDays,
+      calendar: var_calendar,
+    );
+  }
+
+  @protected
+  PeriodViewSnapshot sse_decode_period_view_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_period = sse_decode_period_snapshot(deserializer);
+    var var_plan = sse_decode_budget_plan_snapshot(deserializer);
+    var var_budget = sse_decode_budget_snapshot(deserializer);
+    var var_income = sse_decode_list_income_snapshot(deserializer);
+    var var_expectedIncome = sse_decode_list_expected_income_snapshot(
+      deserializer,
+    );
+    var var_expectedTotal = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_targets = sse_decode_list_planned_snapshot(deserializer);
+    var var_obligations = sse_decode_list_planned_snapshot(deserializer);
+    return PeriodViewSnapshot(
+      period: var_period,
+      plan: var_plan,
+      budget: var_budget,
+      income: var_income,
+      expectedIncome: var_expectedIncome,
+      expectedTotal: var_expectedTotal,
+      targets: var_targets,
+      obligations: var_obligations,
+    );
+  }
+
+  @protected
   PlannedReportSnapshot sse_decode_planned_report_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -3150,6 +3627,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   PlannedSnapshot sse_decode_planned_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_periodId = sse_decode_opt_String(deserializer);
     var var_id = sse_decode_String(deserializer);
     var var_description = sse_decode_String(deserializer);
     var var_amount = sse_decode_CastedPrimitive_i_64(deserializer);
@@ -3159,7 +3637,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_status = sse_decode_String(deserializer);
     var var_paidDate = sse_decode_opt_String(deserializer);
     var var_purchaseId = sse_decode_opt_String(deserializer);
+    var var_essentialId = sse_decode_opt_String(deserializer);
     return PlannedSnapshot(
+      periodId: var_periodId,
       id: var_id,
       description: var_description,
       amount: var_amount,
@@ -3169,6 +3649,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: var_status,
       paidDate: var_paidDate,
       purchaseId: var_purchaseId,
+      essentialId: var_essentialId,
     );
   }
 
@@ -3205,6 +3686,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       amount: var_amount,
       category: var_category,
       fundedByGoal: var_fundedByGoal,
+    );
+  }
+
+  @protected
+  ReceiveIncomeRequest sse_decode_receive_income_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_date = sse_decode_String(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_periodId = sse_decode_opt_String(deserializer);
+    var var_startNew = sse_decode_bool(deserializer);
+    var var_kind = sse_decode_String(deserializer);
+    var var_customDays = sse_decode_u_16(deserializer);
+    var var_through = sse_decode_opt_String(deserializer);
+    var var_expected = sse_decode_bool(deserializer);
+    return ReceiveIncomeRequest(
+      id: var_id,
+      date: var_date,
+      amount: var_amount,
+      periodId: var_periodId,
+      startNew: var_startNew,
+      kind: var_kind,
+      customDays: var_customDays,
+      through: var_through,
+      expected: var_expected,
     );
   }
 
@@ -3258,11 +3766,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_id = sse_decode_String(deserializer);
     var var_name = sse_decode_String(deserializer);
     var var_amount = sse_decode_CastedPrimitive_i_64(deserializer);
+    var var_date = sse_decode_String(deserializer);
+    var var_recurrence = sse_decode_String(deserializer);
+    var var_customDays = sse_decode_u_16(deserializer);
+    var var_until = sse_decode_opt_String(deserializer);
     return RequiredExpenseSnapshot(
       id: var_id,
       name: var_name,
       amount: var_amount,
+      date: var_date,
+      recurrence: var_recurrence,
+      customDays: var_customDays,
+      until: var_until,
     );
+  }
+
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint16();
   }
 
   @protected
@@ -3369,6 +3891,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_list_income_snapshot(self.income, serializer);
     sse_encode_list_expected_income_snapshot(self.expectedIncome, serializer);
     sse_encode_list_budget_plan_snapshot(self.plans, serializer);
+    sse_encode_budget_plan_snapshot(self.currentPlan, serializer);
+    sse_encode_opt_box_autoadd_period_snapshot(self.currentPeriod, serializer);
+    sse_encode_list_period_snapshot(self.periods, serializer);
+    sse_encode_list_required_expense_snapshot(self.essentials, serializer);
+    sse_encode_list_income_day_snapshot(self.incomeDays, serializer);
     sse_encode_list_day_snapshot(self.days, serializer);
     sse_encode_list_planned_snapshot(self.planned, serializer);
   }
@@ -3386,19 +3913,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_period_snapshot(
+    PeriodSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_period_snapshot(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_receive_income_request(
+    ReceiveIncomeRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_receive_income_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_budget_plan_snapshot(
     BudgetPlanSnapshot self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.periodId, serializer);
     sse_encode_String(self.effective, serializer);
-    sse_encode_opt_CastedPrimitive_i_64(self.salary, serializer);
-    sse_encode_CastedPrimitive_i_64(self.dailyBudget, serializer);
-    sse_encode_list_required_expense_snapshot(self.expenses, serializer);
     sse_encode_CastedPrimitive_i_64(self.savings, serializer);
-    sse_encode_u_8(self.payday, serializer);
-    sse_encode_String(self.calendar, serializer);
-    sse_encode_bool(self.legacy, serializer);
   }
 
   @protected
@@ -3419,6 +3959,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_CastedPrimitive_i_64(self.savings, serializer);
     sse_encode_CastedPrimitive_i_64(self.funds, serializer);
     sse_encode_CastedPrimitive_i_64(self.reserved, serializer);
+    sse_encode_CastedPrimitive_i_64(self.fundedExpenses, serializer);
     sse_encode_CastedPrimitive_i_64(self.recommendation, serializer);
     sse_encode_CastedPrimitive_i_64(self.shortfall, serializer);
   }
@@ -3471,7 +4012,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_day_snapshot(DaySnapshot self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.date, serializer);
-    sse_encode_opt_CastedPrimitive_i_64(self.budget, serializer);
     sse_encode_list_purchase_snapshot(self.purchases, serializer);
   }
 
@@ -3481,6 +4021,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.periodId, serializer);
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.date, serializer);
     sse_encode_CastedPrimitive_i_64(self.amount, serializer);
@@ -3498,11 +4039,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_i_32(self.extraDays, serializer);
     sse_encode_opt_box_autoadd_i_32(self.fasterDays, serializer);
     sse_encode_CastedPrimitive_i_64(self.contribution, serializer);
-    sse_encode_CastedPrimitive_i_64(self.monthlyIncome, serializer);
+    sse_encode_CastedPrimitive_i_64(self.periodIncome, serializer);
     sse_encode_CastedPrimitive_i_64(self.dailyAllowance, serializer);
     sse_encode_opt_CastedPrimitive_i_64(self.requiredIncome, serializer);
     sse_encode_CastedPrimitive_i_64(self.dailyLimit, serializer);
-    sse_encode_opt_CastedPrimitive_i_64(self.monthlySaving, serializer);
+    sse_encode_opt_CastedPrimitive_i_64(self.periodSaving, serializer);
     sse_encode_opt_CastedPrimitive_i_64(self.incomeGap, serializer);
     sse_encode_CastedPrimitive_i_64(self.spendingReduction, serializer);
     sse_encode_CastedPrimitive_i_64(self.allocated, serializer);
@@ -3522,7 +4063,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
     sse_encode_i_32(self.periods, serializer);
-    sse_encode_opt_CastedPrimitive_i_64(self.requiredMonthly, serializer);
+    sse_encode_opt_CastedPrimitive_i_64(self.requiredPerPeriod, serializer);
     sse_encode_CastedPrimitive_i_64(self.projected, serializer);
     sse_encode_i_32(self.percent, serializer);
     sse_encode_opt_CastedPrimitive_i_64(self.difference, serializer);
@@ -3544,11 +4085,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_income_day_snapshot(
+    IncomeDaySnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.date, serializer);
+    sse_encode_CastedPrimitive_i_64(self.received, serializer);
+    sse_encode_CastedPrimitive_i_64(self.expected, serializer);
+    sse_encode_i_32(self.count, serializer);
+  }
+
+  @protected
   void sse_encode_income_snapshot(
     IncomeSnapshot self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.periodId, serializer);
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.date, serializer);
     sse_encode_CastedPrimitive_i_64(self.amount, serializer);
@@ -3636,6 +4190,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_income_day_snapshot(
+    List<IncomeDaySnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_income_day_snapshot(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_income_snapshot(
     List<IncomeSnapshot> self,
     SseSerializer serializer,
@@ -3644,6 +4210,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_income_snapshot(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_period_snapshot(
+    List<PeriodSnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_period_snapshot(item, serializer);
     }
   }
 
@@ -3751,6 +4329,63 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_period_snapshot(
+    PeriodSnapshot? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_period_snapshot(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_period_snapshot(
+    PeriodSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.start, serializer);
+    sse_encode_String(self.end, serializer);
+    sse_encode_String(self.previousDate, serializer);
+    sse_encode_String(self.changeFrom, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_CastedPrimitive_i_64(self.income, serializer);
+    sse_encode_CastedPrimitive_i_64(self.expenses, serializer);
+    sse_encode_CastedPrimitive_i_64(self.savings, serializer);
+    sse_encode_CastedPrimitive_i_64(self.plannedSavings, serializer);
+    sse_encode_CastedPrimitive_i_64(self.contributedSavings, serializer);
+    sse_encode_CastedPrimitive_i_64(self.remaining, serializer);
+    sse_encode_CastedPrimitive_i_64(self.carry, serializer);
+    sse_encode_CastedPrimitive_i_64(self.reserved, serializer);
+    sse_encode_CastedPrimitive_i_64(self.fundedExpenses, serializer);
+    sse_encode_String(self.nextDate, serializer);
+    sse_encode_String(self.recurrence, serializer);
+    sse_encode_u_16(self.customDays, serializer);
+    sse_encode_String(self.calendar, serializer);
+  }
+
+  @protected
+  void sse_encode_period_view_snapshot(
+    PeriodViewSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_period_snapshot(self.period, serializer);
+    sse_encode_budget_plan_snapshot(self.plan, serializer);
+    sse_encode_budget_snapshot(self.budget, serializer);
+    sse_encode_list_income_snapshot(self.income, serializer);
+    sse_encode_list_expected_income_snapshot(self.expectedIncome, serializer);
+    sse_encode_CastedPrimitive_i_64(self.expectedTotal, serializer);
+    sse_encode_list_planned_snapshot(self.targets, serializer);
+    sse_encode_list_planned_snapshot(self.obligations, serializer);
+  }
+
+  @protected
   void sse_encode_planned_report_snapshot(
     PlannedReportSnapshot self,
     SseSerializer serializer,
@@ -3769,6 +4404,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.periodId, serializer);
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.description, serializer);
     sse_encode_CastedPrimitive_i_64(self.amount, serializer);
@@ -3778,6 +4414,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.status, serializer);
     sse_encode_opt_String(self.paidDate, serializer);
     sse_encode_opt_String(self.purchaseId, serializer);
+    sse_encode_opt_String(self.essentialId, serializer);
   }
 
   @protected
@@ -3804,6 +4441,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_CastedPrimitive_i_64(self.amount, serializer);
     sse_encode_String(self.category, serializer);
     sse_encode_bool(self.fundedByGoal, serializer);
+  }
+
+  @protected
+  void sse_encode_receive_income_request(
+    ReceiveIncomeRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.date, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_opt_String(self.periodId, serializer);
+    sse_encode_bool(self.startNew, serializer);
+    sse_encode_String(self.kind, serializer);
+    sse_encode_u_16(self.customDays, serializer);
+    sse_encode_opt_String(self.through, serializer);
+    sse_encode_bool(self.expected, serializer);
   }
 
   @protected
@@ -3844,6 +4498,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.name, serializer);
     sse_encode_CastedPrimitive_i_64(self.amount, serializer);
+    sse_encode_String(self.date, serializer);
+    sse_encode_String(self.recurrence, serializer);
+    sse_encode_u_16(self.customDays, serializer);
+    sse_encode_opt_String(self.until, serializer);
+  }
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint16(self);
   }
 
   @protected
@@ -3904,10 +4568,14 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     category: category,
   );
 
-  Future<BudgetSnapshot> budgetSummary({required String date}) => RustLib
-      .instance
-      .api
-      .crateApiPouchAppBudgetSummary(that: this, date: date);
+  Future<BudgetSnapshot> budgetSummary({
+    required String date,
+    String? periodId,
+  }) => RustLib.instance.api.crateApiPouchAppBudgetSummary(
+    that: this,
+    date: date,
+    periodId: periodId,
+  );
 
   Future<void> cacheEconomicProfile({required String contents}) => RustLib
       .instance
@@ -3988,12 +4656,14 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     required String selectedId,
     required bool recommended,
     required bool incomeRequired,
+    String? periodId,
   }) => RustLib.instance.api.crateApiPouchAppFinancialForecast(
     that: this,
     asOf: asOf,
     selectedId: selectedId,
     recommended: recommended,
     incomeRequired: incomeRequired,
+    periodId: periodId,
   );
 
   Future<List<GoalForecastSnapshot>> goalForecast({required String asOf}) =>
@@ -4003,15 +4673,6 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
       .instance
       .api
       .crateApiPouchAppImportBackup(that: this, contents: contents);
-
-  Future<AppSnapshot> markExpectedIncomeReceived({
-    required String id,
-    required String receivedDate,
-  }) => RustLib.instance.api.crateApiPouchAppMarkExpectedIncomeReceived(
-    that: this,
-    id: id,
-    receivedDate: receivedDate,
-  );
 
   Future<AppSnapshot> markPlannedPaid({
     required String planId,
@@ -4026,16 +4687,14 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     amount: amount,
   );
 
-  Future<AppSnapshot> recordIncome({
-    required String id,
-    required String date,
-    required String amount,
-  }) => RustLib.instance.api.crateApiPouchAppRecordIncome(
-    that: this,
-    id: id,
-    date: date,
-    amount: amount,
-  );
+  Future<PeriodViewSnapshot> periodView({required String date}) =>
+      RustLib.instance.api.crateApiPouchAppPeriodView(that: this, date: date);
+
+  Future<AppSnapshot> receiveIncome({required ReceiveIncomeRequest receipt}) =>
+      RustLib.instance.api.crateApiPouchAppReceiveIncome(
+        that: this,
+        receipt: receipt,
+      );
 
   Future<AppSnapshot> removeBudgetPlan({required String effective}) => RustLib
       .instance
@@ -4049,6 +4708,9 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
 
   Future<AppSnapshot> removeIncome({required String id}) =>
       RustLib.instance.api.crateApiPouchAppRemoveIncome(that: this, id: id);
+
+  Future<AppSnapshot> removePeriod({required String id}) =>
+      RustLib.instance.api.crateApiPouchAppRemovePeriod(that: this, id: id);
 
   Future<AppSnapshot> removePlanned({required String id}) =>
       RustLib.instance.api.crateApiPouchAppRemovePlanned(that: this, id: id);
@@ -4103,24 +4765,46 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
       .crateApiPouchAppResetEconomicProfile(that: this, country: country);
 
   Future<AppSnapshot> saveBudgetPlan({
+    required String periodId,
     required String effective,
-    String? salary,
-    required String dailyBudget,
-    required List<String> expenseIds,
-    required List<String> expenseNames,
-    required List<String> expenseAmounts,
     required String savings,
-    required int payday,
   }) => RustLib.instance.api.crateApiPouchAppSaveBudgetPlan(
     that: this,
+    periodId: periodId,
     effective: effective,
-    salary: salary,
-    dailyBudget: dailyBudget,
-    expenseIds: expenseIds,
-    expenseNames: expenseNames,
-    expenseAmounts: expenseAmounts,
     savings: savings,
-    payday: payday,
+  );
+
+  Future<AppSnapshot> saveEssentialExpense({
+    required String id,
+    required String name,
+    required String amount,
+    required String date,
+    required String kind,
+    required int customDays,
+  }) => RustLib.instance.api.crateApiPouchAppSaveEssentialExpense(
+    that: this,
+    id: id,
+    name: name,
+    amount: amount,
+    date: date,
+    kind: kind,
+    customDays: customDays,
+  );
+
+  Future<AppSnapshot> savePeriod({
+    String? id,
+    required String start,
+    required String kind,
+    required int customDays,
+    String? through,
+  }) => RustLib.instance.api.crateApiPouchAppSavePeriod(
+    that: this,
+    id: id,
+    start: start,
+    kind: kind,
+    customDays: customDays,
+    through: through,
   );
 
   Future<AppSnapshot> savePlanned({
@@ -4130,6 +4814,7 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     required String category,
     required String kind,
     required String date,
+    String? periodId,
   }) => RustLib.instance.api.crateApiPouchAppSavePlanned(
     that: this,
     id: id,
@@ -4138,26 +4823,20 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     category: category,
     kind: kind,
     date: date,
+    periodId: periodId,
   );
 
   Future<AppSnapshot> scheduleIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) => RustLib.instance.api.crateApiPouchAppScheduleIncome(
     that: this,
     id: id,
     date: date,
     amount: amount,
-  );
-
-  Future<AppSnapshot> setDailyOverride({
-    required String date,
-    String? amount,
-  }) => RustLib.instance.api.crateApiPouchAppSetDailyOverride(
-    that: this,
-    date: date,
-    amount: amount,
+    periodId: periodId,
   );
 
   Future<AppSnapshot> snapshot() =>
@@ -4174,6 +4853,15 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     country: country,
   );
 
+  Future<AppSnapshot> stopEssentialExpense({
+    required String id,
+    required String date,
+  }) => RustLib.instance.api.crateApiPouchAppStopEssentialExpense(
+    that: this,
+    id: id,
+    date: date,
+  );
+
   Future<String> today() =>
       RustLib.instance.api.crateApiPouchAppToday(that: this);
 
@@ -4184,22 +4872,26 @@ class PouchAppImpl extends RustOpaque implements PouchApp {
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) => RustLib.instance.api.crateApiPouchAppUpdateExpectedIncome(
     that: this,
     id: id,
     date: date,
     amount: amount,
+    periodId: periodId,
   );
 
   Future<AppSnapshot> updateIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) => RustLib.instance.api.crateApiPouchAppUpdateIncome(
     that: this,
     id: id,
     date: date,
     amount: amount,
+    periodId: periodId,
   );
 
   Future<AppSnapshot> updatePreferences({

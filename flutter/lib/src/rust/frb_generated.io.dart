@@ -68,6 +68,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_box_autoadd_i_32(dynamic raw);
 
   @protected
+  PeriodSnapshot dco_decode_box_autoadd_period_snapshot(dynamic raw);
+
+  @protected
+  ReceiveIncomeRequest dco_decode_box_autoadd_receive_income_request(
+    dynamic raw,
+  );
+
+  @protected
   BudgetPlanSnapshot dco_decode_budget_plan_snapshot(dynamic raw);
 
   @protected
@@ -104,6 +112,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  IncomeDaySnapshot dco_decode_income_day_snapshot(dynamic raw);
+
+  @protected
   IncomeSnapshot dco_decode_income_snapshot(dynamic raw);
 
   @protected
@@ -134,7 +145,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<IncomeDaySnapshot> dco_decode_list_income_day_snapshot(dynamic raw);
+
+  @protected
   List<IncomeSnapshot> dco_decode_list_income_snapshot(dynamic raw);
+
+  @protected
+  List<PeriodSnapshot> dco_decode_list_period_snapshot(dynamic raw);
 
   @protected
   List<PlannedReportSnapshot> dco_decode_list_planned_report_snapshot(
@@ -168,6 +185,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
 
   @protected
+  PeriodSnapshot? dco_decode_opt_box_autoadd_period_snapshot(dynamic raw);
+
+  @protected
+  PeriodSnapshot dco_decode_period_snapshot(dynamic raw);
+
+  @protected
+  PeriodViewSnapshot dco_decode_period_view_snapshot(dynamic raw);
+
+  @protected
   PlannedReportSnapshot dco_decode_planned_report_snapshot(dynamic raw);
 
   @protected
@@ -180,6 +206,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PurchaseSnapshot dco_decode_purchase_snapshot(dynamic raw);
 
   @protected
+  ReceiveIncomeRequest dco_decode_receive_income_request(dynamic raw);
+
+  @protected
   ReportEntrySnapshot dco_decode_report_entry_snapshot(dynamic raw);
 
   @protected
@@ -187,6 +216,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RequiredExpenseSnapshot dco_decode_required_expense_snapshot(dynamic raw);
+
+  @protected
+  int dco_decode_u_16(dynamic raw);
 
   @protected
   BigInt dco_decode_u_64(dynamic raw);
@@ -243,6 +275,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
+  PeriodSnapshot sse_decode_box_autoadd_period_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReceiveIncomeRequest sse_decode_box_autoadd_receive_income_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   BudgetPlanSnapshot sse_decode_budget_plan_snapshot(
     SseDeserializer deserializer,
   );
@@ -295,6 +337,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  IncomeDaySnapshot sse_decode_income_day_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   IncomeSnapshot sse_decode_income_snapshot(SseDeserializer deserializer);
 
   @protected
@@ -329,7 +376,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<IncomeDaySnapshot> sse_decode_list_income_day_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<IncomeSnapshot> sse_decode_list_income_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PeriodSnapshot> sse_decode_list_period_snapshot(
     SseDeserializer deserializer,
   );
 
@@ -371,6 +428,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
+  PeriodSnapshot? sse_decode_opt_box_autoadd_period_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PeriodSnapshot sse_decode_period_snapshot(SseDeserializer deserializer);
+
+  @protected
+  PeriodViewSnapshot sse_decode_period_view_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PlannedReportSnapshot sse_decode_planned_report_snapshot(
     SseDeserializer deserializer,
   );
@@ -387,6 +457,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PurchaseSnapshot sse_decode_purchase_snapshot(SseDeserializer deserializer);
 
   @protected
+  ReceiveIncomeRequest sse_decode_receive_income_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ReportEntrySnapshot sse_decode_report_entry_snapshot(
     SseDeserializer deserializer,
   );
@@ -398,6 +473,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RequiredExpenseSnapshot sse_decode_required_expense_snapshot(
     SseDeserializer deserializer,
   );
+
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer);
@@ -456,6 +534,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_period_snapshot(
+    PeriodSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_receive_income_request(
+    ReceiveIncomeRequest self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_budget_plan_snapshot(
@@ -521,6 +611,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_income_day_snapshot(
+    IncomeDaySnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_income_snapshot(
     IncomeSnapshot self,
     SseSerializer serializer,
@@ -566,8 +662,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_income_day_snapshot(
+    List<IncomeDaySnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_income_snapshot(
     List<IncomeSnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_period_snapshot(
+    List<PeriodSnapshot> self,
     SseSerializer serializer,
   );
 
@@ -617,6 +725,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_period_snapshot(
+    PeriodSnapshot? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_period_snapshot(
+    PeriodSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_period_view_snapshot(
+    PeriodViewSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_planned_report_snapshot(
     PlannedReportSnapshot self,
     SseSerializer serializer,
@@ -641,6 +767,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_receive_income_request(
+    ReceiveIncomeRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_report_entry_snapshot(
     ReportEntrySnapshot self,
     SseSerializer serializer,
@@ -657,6 +789,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     RequiredExpenseSnapshot self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_64(BigInt self, SseSerializer serializer);

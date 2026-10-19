@@ -41,17 +41,10 @@ fn apply_country_defaults(preferences: &mut Preferences) {
 fn has_recorded_amounts(state: &AppState) -> bool {
     !state.income.is_empty()
         || !state.expected_income.is_empty()
-        || state.plans.iter().any(|plan| {
-            plan.fallback_salary.is_some()
-                || plan.daily_budget.hundredths() > 0
-                || plan.monthly_savings.hundredths() > 0
-                || !plan.expenses.is_empty()
-        })
+        || !state.essentials.is_empty()
+        || state.plans.iter().any(|plan| plan.savings.hundredths() > 0)
         || !state.planned.is_empty()
-        || state
-            .days
-            .values()
-            .any(|day| day.budget_override.is_some() || !day.purchases.is_empty())
+        || state.days.values().any(|day| !day.purchases.is_empty())
 }
 
 #[cfg(test)]

@@ -47,9 +47,10 @@ class PouchCalendarMonth {
 }
 
 class PouchIncome {
-  const PouchIncome(this.id, this.date, this.amount);
+  const PouchIncome(this.id, this.date, this.amount, {this.periodId});
 
   final String id;
+  final String? periodId;
   final String date;
   final int amount;
 
@@ -57,13 +58,15 @@ class PouchIncome {
     value.id as String,
     value.date as String,
     value.amount as int,
+    periodId: value.periodId as String?,
   );
 }
 
 class PouchExpectedIncome {
-  const PouchExpectedIncome(this.id, this.date, this.amount);
+  const PouchExpectedIncome(this.id, this.date, this.amount, {this.periodId});
 
   final String id;
+  final String? periodId;
   final String date;
   final int amount;
 
@@ -71,56 +74,173 @@ class PouchExpectedIncome {
     value.id as String,
     value.date as String,
     value.amount as int,
+    periodId: value.periodId as String?,
   );
 }
 
 class PouchRequiredExpense {
-  const PouchRequiredExpense(this.id, this.name, this.amount);
-
+  const PouchRequiredExpense(
+    this.id,
+    this.name,
+    this.amount,
+    this.date,
+    this.recurrence,
+    this.customDays,
+    this.until,
+  );
   final String id;
   final String name;
   final int amount;
-
+  final String date;
+  final String recurrence;
+  final int customDays;
+  final String? until;
   factory PouchRequiredExpense.fromBridge(dynamic value) =>
       PouchRequiredExpense(
         value.id as String,
         value.name as String,
         value.amount as int,
+        value.date as String,
+        value.recurrence as String,
+        value.customDays as int,
+        value.until as String?,
       );
 }
 
 class PouchBudgetPlan {
   const PouchBudgetPlan({
+    required this.periodId,
     required this.effective,
-    required this.salary,
-    required this.dailyBudget,
-    required this.expenses,
     required this.savings,
-    required this.payday,
-    required this.calendar,
-    required this.legacy,
   });
-
+  final String periodId;
   final String effective;
-  final int? salary;
-  final int dailyBudget;
-  final List<PouchRequiredExpense> expenses;
   final int savings;
-  final int payday;
-  final String calendar;
-  final bool legacy;
-
   factory PouchBudgetPlan.fromBridge(dynamic value) => PouchBudgetPlan(
+    periodId: value.periodId as String,
     effective: value.effective as String,
-    salary: value.salary as int?,
-    dailyBudget: value.dailyBudget as int,
-    expenses: List<dynamic>.from(value.expenses as Iterable)
-        .map(PouchRequiredExpense.fromBridge)
-        .toList(growable: false),
     savings: value.savings as int,
-    payday: value.payday as int,
-    calendar: value.calendar as String,
-    legacy: value.legacy as bool,
+  );
+}
+
+class PouchPeriod {
+  const PouchPeriod(
+    this.id,
+    this.start,
+    this.end,
+    this.previousDate,
+    this.nextDate,
+    this.recurrence,
+    this.customDays,
+    this.calendar,
+    this.changeFrom, {
+    this.status = 'active',
+    this.name = '',
+    this.income = 0,
+    this.expenses = 0,
+    this.savings = 0,
+    this.plannedSavings = 0,
+    this.contributedSavings = 0,
+    this.fundedExpenses = 0,
+    this.remaining = 0,
+    this.carry = 0,
+    this.reserved = 0,
+  });
+  final String id;
+  final String name;
+  String get displayName => name.isEmpty ? id : name;
+  final String start;
+  final String end;
+  final String previousDate;
+  final String changeFrom;
+  final String status;
+  final int income,
+      expenses,
+      savings,
+      plannedSavings,
+      contributedSavings,
+      fundedExpenses,
+      remaining,
+      carry,
+      reserved;
+  final String nextDate;
+  final String recurrence;
+  final int customDays;
+  final String calendar;
+  factory PouchPeriod.fromBridge(dynamic value) => PouchPeriod(
+    value.id as String,
+    value.start as String,
+    value.end as String,
+    value.previousDate as String,
+    value.nextDate as String,
+    value.recurrence as String,
+    value.customDays as int,
+    value.calendar as String,
+    value.changeFrom as String,
+    status: value.status as String,
+    name: value.name as String,
+    income: value.income as int,
+    expenses: value.expenses as int,
+    savings: value.savings as int,
+    plannedSavings: value.plannedSavings as int,
+    contributedSavings: value.contributedSavings as int,
+    fundedExpenses: value.fundedExpenses as int,
+    remaining: value.remaining as int,
+    carry: value.carry as int,
+    reserved: value.reserved as int,
+  );
+}
+
+class PouchPeriodView {
+  const PouchPeriodView(
+    this.period,
+    this.plan,
+    this.budget,
+    this.income,
+    this.expectedIncome,
+    this.expectedTotal,
+    this.obligations, {
+    this.targets = const [],
+  });
+  final PouchPeriod period;
+  final PouchBudgetPlan plan;
+  final PouchBudgetSummary budget;
+  final List<PouchIncome> income;
+  final List<PouchExpectedIncome> expectedIncome;
+  final int expectedTotal;
+  final List<PouchPlannedItem> obligations;
+  final List<PouchPlannedItem> targets;
+  factory PouchPeriodView.fromBridge(dynamic value) => PouchPeriodView(
+    PouchPeriod.fromBridge(value.period),
+    PouchBudgetPlan.fromBridge(value.plan),
+    PouchBudgetSummary.fromBridge(value.budget),
+    List<dynamic>.from(value.income as Iterable)
+        .map(PouchIncome.fromBridge)
+        .toList(growable: false),
+    List<dynamic>.from(value.expectedIncome as Iterable)
+        .map(PouchExpectedIncome.fromBridge)
+        .toList(growable: false),
+    value.expectedTotal as int,
+    List<dynamic>.from(value.obligations as Iterable)
+        .map(PouchPlannedItem.fromBridge)
+        .toList(growable: false),
+    targets: List<dynamic>.from(value.targets as Iterable)
+        .map(PouchPlannedItem.fromBridge)
+        .toList(growable: false),
+  );
+}
+
+class PouchIncomeDay {
+  const PouchIncomeDay(this.date, this.received, this.expected, this.count);
+  final String date;
+  final int received;
+  final int expected;
+  final int count;
+  factory PouchIncomeDay.fromBridge(dynamic value) => PouchIncomeDay(
+    value.date as String,
+    value.received as int,
+    value.expected as int,
+    value.count as int,
   );
 }
 
@@ -149,15 +269,13 @@ class PouchPurchase {
 }
 
 class PouchDay {
-  const PouchDay(this.date, this.budget, this.purchases);
+  const PouchDay(this.date, this.purchases);
 
   final String date;
-  final int? budget;
   final List<PouchPurchase> purchases;
 
   factory PouchDay.fromBridge(dynamic value) => PouchDay(
     value.date as String,
-    value.budget as int?,
     List<dynamic>.from(value.purchases as Iterable)
         .map(PouchPurchase.fromBridge)
         .toList(growable: false),
@@ -175,6 +293,8 @@ class PouchPlannedItem {
     required this.status,
     required this.paidDate,
     required this.purchaseId,
+    this.essentialId,
+    this.periodId,
   });
 
   final String id;
@@ -186,6 +306,8 @@ class PouchPlannedItem {
   final String status;
   final String? paidDate;
   final String? purchaseId;
+  final String? essentialId;
+  final String? periodId;
 
   factory PouchPlannedItem.fromBridge(dynamic value) => PouchPlannedItem(
     id: value.id as String,
@@ -197,6 +319,8 @@ class PouchPlannedItem {
     status: value.status as String,
     paidDate: value.paidDate as String?,
     purchaseId: value.purchaseId as String?,
+    essentialId: value.essentialId as String?,
+    periodId: value.periodId as String?,
   );
 }
 
@@ -210,6 +334,11 @@ class PouchSnapshot {
     required this.income,
     required this.expectedIncome,
     required this.plans,
+    required this.currentPlan,
+    required this.currentPeriod,
+    this.periods = const [],
+    required this.essentials,
+    required this.incomeDays,
     required this.days,
     required this.planned,
   });
@@ -222,6 +351,11 @@ class PouchSnapshot {
   final List<PouchIncome> income;
   final List<PouchExpectedIncome> expectedIncome;
   final List<PouchBudgetPlan> plans;
+  final PouchBudgetPlan currentPlan;
+  final PouchPeriod? currentPeriod;
+  final List<PouchPeriod> periods;
+  final List<PouchRequiredExpense> essentials;
+  final List<PouchIncomeDay> incomeDays;
   final List<PouchDay> days;
   final List<PouchPlannedItem> planned;
 
@@ -236,6 +370,19 @@ class PouchSnapshot {
         .toList(growable: false),
     expectedIncome: List<dynamic>.from(value.expectedIncome as Iterable)
         .map(PouchExpectedIncome.fromBridge)
+        .toList(growable: false),
+    currentPlan: PouchBudgetPlan.fromBridge(value.currentPlan),
+    currentPeriod: value.currentPeriod == null
+        ? null
+        : PouchPeriod.fromBridge(value.currentPeriod),
+    periods: List<dynamic>.from(value.periods as Iterable)
+        .map(PouchPeriod.fromBridge)
+        .toList(growable: false),
+    essentials: List<dynamic>.from(value.essentials as Iterable)
+        .map(PouchRequiredExpense.fromBridge)
+        .toList(growable: false),
+    incomeDays: List<dynamic>.from(value.incomeDays as Iterable)
+        .map(PouchIncomeDay.fromBridge)
         .toList(growable: false),
     plans: List<dynamic>.from(value.plans as Iterable)
         .map(PouchBudgetPlan.fromBridge)
@@ -254,15 +401,6 @@ class PouchSnapshot {
     }
     return null;
   }
-
-  PouchBudgetPlan planAt(String date) {
-    var result = plans.first;
-    for (final plan in plans) {
-      if (plan.effective.compareTo(date) > 0) break;
-      result = plan;
-    }
-    return result;
-  }
 }
 
 class PouchBudgetSummary {
@@ -279,6 +417,7 @@ class PouchBudgetSummary {
     required this.savings,
     required this.funds,
     required this.reserved,
+    this.fundedExpenses = 0,
     required this.recommendation,
     required this.shortfall,
   });
@@ -295,6 +434,7 @@ class PouchBudgetSummary {
   final int savings;
   final int funds;
   final int reserved;
+  final int fundedExpenses;
   final int recommendation;
   final int shortfall;
 
@@ -311,6 +451,7 @@ class PouchBudgetSummary {
     savings: value.savings as int,
     funds: value.funds as int,
     reserved: value.reserved as int,
+    fundedExpenses: value.fundedExpenses as int,
     recommendation: value.recommendation as int,
     shortfall: value.shortfall as int,
   );
@@ -324,11 +465,11 @@ class PouchFinancialForecast {
     required this.extraDays,
     required this.fasterDays,
     required this.contribution,
-    required this.monthlyIncome,
+    required this.periodIncome,
     required this.dailyAllowance,
     required this.requiredIncome,
     required this.dailyLimit,
-    required this.monthlySaving,
+    required this.periodSaving,
     required this.incomeGap,
     required this.spendingReduction,
     required this.allocated,
@@ -345,12 +486,12 @@ class PouchFinancialForecast {
   final int configuredSavings;
   final int? extraDays;
   final int? fasterDays;
-  final int monthlyIncome;
+  final int periodIncome;
   final int contribution;
   final int dailyAllowance;
   final int? requiredIncome;
   final int dailyLimit;
-  final int? monthlySaving;
+  final int? periodSaving;
   final int? incomeGap;
   final int spendingReduction;
   final int allocated;
@@ -369,11 +510,11 @@ class PouchFinancialForecast {
         extraDays: value.extraDays as int?,
         fasterDays: value.fasterDays as int?,
         contribution: value.contribution as int,
-        monthlyIncome: value.monthlyIncome as int,
+        periodIncome: value.periodIncome as int,
         dailyAllowance: value.dailyAllowance as int,
         requiredIncome: value.requiredIncome as int?,
         dailyLimit: value.dailyLimit as int,
-        monthlySaving: value.monthlySaving as int?,
+        periodSaving: value.periodSaving as int?,
         incomeGap: value.incomeGap as int?,
         spendingReduction: value.spendingReduction as int,
         allocated: value.allocated as int,
@@ -390,7 +531,7 @@ class PouchGoalForecast {
   const PouchGoalForecast({
     required this.id,
     required this.periods,
-    required this.requiredMonthly,
+    required this.requiredPerPeriod,
     required this.projected,
     required this.percent,
     required this.difference,
@@ -401,7 +542,7 @@ class PouchGoalForecast {
 
   final String id;
   final int periods;
-  final int? requiredMonthly;
+  final int? requiredPerPeriod;
   final int projected;
   final int percent;
   final int? difference;
@@ -412,7 +553,7 @@ class PouchGoalForecast {
   factory PouchGoalForecast.fromBridge(dynamic value) => PouchGoalForecast(
     id: value.id as String,
     periods: value.periods as int,
-    requiredMonthly: value.requiredMonthly as int?,
+    requiredPerPeriod: value.requiredPerPeriod as int?,
     projected: value.projected as int,
     percent: value.percent as int,
     difference: value.difference as int?,

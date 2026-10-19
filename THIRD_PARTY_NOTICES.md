@@ -13,3 +13,7 @@ Dependency versions are recorded in flutter/pubspec.lock and rust/Cargo.lock. Th
 The Canada Standard Forecast attributes OECD Taxing Wages, Statistics Canada Household Spending/CPI tables and Bank of Canada indicative daily exchange rates. The displayed scenario combines and adjusts these sources; calculated estimates are Pouch's own and no provider endorsement is implied. Statistics Canada data are used under its Open Licence (https://www.statcan.gc.ca/en/terms-conditions/open-licence). OECD and Bank of Canada data remain subject to their source terms; preserve attribution and distinguish adjustments from original statistics. Exact series, reference periods and source/terms links are recorded in docs/ECONOMIC_PROFILES.md. Iran survey content is not embedded as an automatic forecast; reuse rights still require review before a future distributed profile.
 
 The economic HTTP adapter adds reqwest, rustls and csv dependencies. Preserve their upstream licenses and transitive notices after Cargo dependency resolution; no paid API library or embedded credential is included.
+
+## Vazirmatn interface font
+
+The Flutter interface bundles unmodified Vazirmatn Regular, Medium, and Bold from the official rastikerdar/vazirmatn repository, release v33.003. Vazirmatn is licensed under the SIL Open Font License 1.1; its copyright and license are included in flutter/assets/fonts/Vazirmatn-OFL.txt. Amiri remains bundled for PDF reports.

@@ -64,7 +64,7 @@ Future<Uint8List> buildPouchReportPdf({
         cellAlignment: pw.Alignment.centerRight,
         headerStyle: pw.TextStyle(font: bold),
         headerDecoration: const pw.BoxDecoration(
-          color: PdfColor.fromInt(0xfff7edd9),
+          color: PdfColor.fromInt(0xffe2f0eb),
         ),
         cellPadding: const pw.EdgeInsets.all(7),
       );
@@ -77,7 +77,7 @@ Future<Uint8List> buildPouchReportPdf({
       cellAlignment: pw.Alignment.centerLeft,
       headerStyle: pw.TextStyle(font: bold),
       headerDecoration: const pw.BoxDecoration(
-        color: PdfColor.fromInt(0xfff7edd9),
+        color: PdfColor.fromInt(0xffe2f0eb),
       ),
       cellPadding: const pw.EdgeInsets.all(7),
     );

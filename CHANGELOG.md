@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+- Verify the updated application manually on Android and Linux.
+
+- Refresh the README walkthrough with current Android screenshots while preserving the Pouch banner.
+
+- Make period editing explicit and add confirmed deletion for unused periods, preserving financial records and supporting undo.
+- Add deletion persistence and period-control interaction coverage.
+
+- Integrate income entry into its calendar with explicit save buttons, independent period assignment, and successful-save coin feedback.
+- Add stable generated period names and shared selectors for budgets, plans, savings goals, and Personal Forecast, with clear calculation-context messages in Today and beneath selectors.
+- Preserve current user records and IDs while upgrading period metadata; read previous binary and JSON formats and retain the recovery copy.
+- Add period assignment, forecast isolation, compatibility, calendar-save, and selector layout coverage. Bindings are regenerated from source without compilation.
+
+- Play coin bursts after saving daily purchases, planned expenses, and savings goals.
+- Add a shaded rotating coin beside Pouch on desktop, mobile, and About, with shared artwork for bursts and reduced-motion support.
+- Cover save success, rejection, cancellation, rotating-coin lifecycle, and responsive branding.
+
+- Add Delete beside Edit for every savings revision, with confirmation, Undo, and affected savings recalculation.
+- Add brief coin bursts for received income and savings increases, plus subtle page transitions that respect reduced motion.
+- Add savings deletion, persistence, Undo, success-feedback, and animation lifecycle regressions.
+
+- Allow future dates in Today and record their expenses as plans, with shared editing and payment controls.
+- Simplify all screens, explain savings set aside, prioritize income entry and forecast results, and move About into Settings.
+- Add future-calendar/payment and Settings navigation regressions.
+
+- Replace generated budget schedules with explicit editable periods and income-calendar receipt choices.
+- Preserve stable IDs, shared boundaries, protected savings, reservations, debt and one-time rollover in Rust.
+- Add personal period forecasting and historical summaries while keeping Standard Forecast independent.
+- Restore date-based purchase entry and history inside Today, combine expenses and savings under Plans, and simplify period selection and setup.
+- Restore the cream and light-brown default theme with bundled Vazirmatn interface typography and consistent responsive components.
+- Introduce binary envelope 3, state schema 5 and JSON backup 8, with explicit archival of incompatible development data.
+- Add accounting, transaction, forecast, navigation, localization and responsive-layout regressions.
+
 ## 2.0.0
 
 - Add Linux x64 and Windows x64 desktop applications alongside Android.

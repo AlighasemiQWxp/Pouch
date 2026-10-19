@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/pouch_bridge.dart';
-import '../../core/pouch_formatters.dart';
 import '../../core/pouch_models.dart';
 import '../../core/pouch_theme.dart';
 import '../../widgets/pouch_widgets.dart';
-import '../../widgets/pouch_date_picker.dart';
+import '../../widgets/pouch_period_selector.dart';
+import '../budget_plan/essential_expenses.dart';
+import 'planned_item_widgets.dart';
 
 class PlannedScreen extends StatefulWidget {
   const PlannedScreen({
@@ -16,6 +17,7 @@ class PlannedScreen extends StatefulWidget {
     required this.today,
     required this.run,
     required this.undo,
+    this.kind = 'expense',
     super.key,
   });
 
@@ -25,6 +27,7 @@ class PlannedScreen extends StatefulWidget {
   final String today;
   final PouchMutation run;
   final PouchUndo undo;
+  final String kind;
 
   @override
   State<PlannedScreen> createState() => _PlannedScreenState();
@@ -32,14 +35,23 @@ class PlannedScreen extends StatefulWidget {
 
 class _PlannedScreenState extends State<PlannedScreen> {
   String _statusFilter = 'pending';
+  String? _periodId;
+  late String _kind = widget.kind;
 
   @override
   Widget build(BuildContext context) {
     final strings = widget.strings;
+    final selected = selectedPouchPeriod(
+      widget.snapshot,
+      PouchPeriodScope.maybeOf(context)?.periodId ?? _periodId,
+    );
     final items =
         widget.snapshot.planned
             .where(
-              (item) => _statusFilter == 'all' || item.status == _statusFilter,
+              (item) =>
+                  item.kind == _kind &&
+                  (item.periodId == null || item.periodId == selected?.id) &&
+                  (_statusFilter == 'all' || item.status == _statusFilter),
             )
             .toList()
           ..sort((left, right) => left.date.compareTo(right.date));
@@ -47,26 +59,52 @@ class _PlannedScreenState extends State<PlannedScreen> {
       children: [
         PouchIntro(
           eyebrow: strings.text('planningLabel'),
-          title: strings.text('plannedPageTitle'),
-          description: strings.text('plannedPageHint'),
+          title: strings.text('plansTitle'),
+          description: strings.text('plansHint'),
         ),
+        PouchPeriodSelector(
+          periods: widget.snapshot.periods,
+          selectedId: selected?.id,
+          strings: strings,
+          onChanged: (id) {
+            setState(() => _periodId = id);
+            PouchPeriodScope.maybeOf(context)?.onChanged(id);
+          },
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            for (final kind in ['expense', 'goal'])
+              ChoiceChip(
+                label: Text(
+                  strings.text(kind == 'goal' ? 'navSavings' : 'navPlanned'),
+                ),
+                selected: _kind == kind,
+                onSelected: (_) => setState(() => _kind = kind),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
         PouchCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text(
-                      strings.text('yourPlans'),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
+                  Text(
+                    strings.text(_kind == 'goal' ? 'yourGoals' : 'yourPlans'),
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                   PouchPrimaryButton(
-                    label: strings.text('addPlan'),
+                    label: strings.text(
+                      _kind == 'goal' ? 'addGoal' : 'addPlannedExpense',
+                    ),
                     icon: Icons.add_rounded,
                     onPressed: () => _editPlan(),
                   ),
@@ -110,7 +148,7 @@ class _PlannedScreenState extends State<PlannedScreen> {
                 )
               else
                 for (final item in items)
-                  _PlannedTile(
+                  PlannedItemTile(
                     item: item,
                     strings: strings,
                     currency: widget.snapshot.preferences.currency,
@@ -126,539 +164,42 @@ class _PlannedScreenState extends State<PlannedScreen> {
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Future<void> _editPlan([PouchPlannedItem? existing]) async {
-    final result = await showDialog<_PlannedValues>(
-      context: context,
-      builder: (context) => _PlannedDialog(
-        bridge: widget.bridge,
-        strings: widget.strings,
-        today: widget.today,
-        firstDate: widget.snapshot.startDate,
-        calendar: widget.snapshot.preferences.calendar,
-        weekStart: widget.snapshot.preferences.weekStart,
-        existing: existing,
-      ),
-    );
-    if (result == null) return;
-    await widget.run(
-      () => widget.bridge.savePlanned(
-        id: existing?.id ?? _newId(),
-        description: result.description,
-        amount: result.amount,
-        category: result.category,
-        kind: result.kind,
-        date: result.date,
-      ),
-    );
-  }
-
-  Future<void> _deletePlan(PouchPlannedItem item) async {
-    final approved = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(widget.strings.text('deletePlan')),
-        content: Text(item.description),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(widget.strings.text('cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(widget.strings.text('delete')),
-          ),
-        ],
-      ),
-    );
-    if (approved != true) return;
-    final deleted = await widget.run(
-      () => widget.bridge.removePlanned(item.id),
-    );
-    if (deleted && mounted) {
-      showPouchUndoMessage(context, widget.strings, 'deleted', widget.undo);
-    }
-  }
-}
-
-class _PlannedTile extends StatelessWidget {
-  const _PlannedTile({
-    required this.item,
-    required this.strings,
-    required this.currency,
-    required this.calendar,
-    required this.weekStart,
-    required this.startDate,
-    required this.bridge,
-    required this.today,
-    required this.run,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final PouchPlannedItem item;
-  final AppStrings strings;
-  final String currency;
-  final String calendar;
-  final int weekStart;
-  final String startDate;
-  final PouchBridge bridge;
-  final String today;
-  final PouchMutation run;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final pending = item.status == 'pending';
-    final icon = item.kind == 'goal'
-        ? Icons.savings_outlined
-        : Icons.event_note_outlined;
-    final titleAndDate = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(item.description, style: TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 3),
-        Wrap(
-          spacing: 4,
-          children: [
-            Text(
-              strings.text(
-                item.kind == 'goal' ? 'savingsGoalType' : 'plannedExpenseType',
-              ),
-              style: TextStyle(color: context.pouchPalette.muted, fontSize: 11),
-            ),
-            PouchDateLabel(
-              bridge: bridge,
-              strings: strings,
-              date: item.date,
-              calendar: calendar,
-            ),
-          ],
-        ),
-        if (pending)
-          FutureBuilder<PouchFinancialForecast>(
-            future: bridge.financialForecast(today, item.id),
-            builder: (context, value) {
-              if (value.connectionState != ConnectionState.done ||
-                  !value.hasData) {
-                return const SizedBox.shrink();
-              }
-              return Text(
-                strings.text('planAllocated', {
-                  'amount': formatMoney(
-                    value.data!.allocated,
-                    currency,
-                    strings,
-                  ),
-                }),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 11,
-                ),
-              );
-            },
-          ),
-        if (!pending && item.paidDate != null)
-          FutureBuilder<String>(
-            future: formatPouchDate(bridge, item.paidDate!, calendar, strings),
-            builder: (context, value) => Text(
-              strings.text('planPaid', {
-                'date':
-                    value.data ??
-                    localizeDigits(item.paidDate!, strings.language),
-              }),
-              style: TextStyle(color: context.pouchPalette.muted, fontSize: 11),
-            ),
-          ),
-      ],
-    );
-    final amount = Text(
-      formatMoney(item.amount, currency, strings),
-      style: TextStyle(fontWeight: FontWeight.w700),
-    );
-    final actions = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        PouchIconButton(
-          label: strings.text(
-            item.kind == 'goal' ? 'goalPurchased' : 'recordPayment',
-          ),
-          icon: Icons.check_circle_outline_rounded,
-          onPressed: () => _recordPayment(context),
-        ),
-        PouchIconButton(
-          label: strings.text('edit'),
-          icon: Icons.edit_outlined,
-          onPressed: onEdit,
-        ),
-        PouchIconButton(
-          label: strings.text('delete'),
-          icon: Icons.delete_outline_rounded,
-          onPressed: onDelete,
-        ),
-      ],
-    );
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsetsDirectional.fromSTEB(13, 11, 6, 11),
-      decoration: BoxDecoration(
-        color: item.kind == 'goal'
-            ? context.pouchPalette.surfaceWarm
-            : context.pouchPalette.surface,
-        border: Border.all(color: context.pouchPalette.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final iconWidget = Icon(
-            icon,
-            color: context.pouchPalette.goldDeep,
-            size: 20,
-          );
-          if (constraints.maxWidth < 560) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    iconWidget,
-                    const SizedBox(width: 11),
-                    Expanded(child: titleAndDate),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [amount, if (pending) actions],
-                ),
-              ],
-            );
-          }
-          return Row(
-            children: [
-              iconWidget,
-              const SizedBox(width: 11),
-              Expanded(child: titleAndDate),
-              amount,
-              if (pending) actions,
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _recordPayment(BuildContext context) async {
-    final values = await showDialog<_PaymentValues>(
-      context: context,
-      builder: (context) => _PaymentDialog(
-        bridge: bridge,
-        strings: strings,
-        today: today,
-        firstDate: startDate,
-        calendar: calendar,
-        weekStart: weekStart,
-        amount: amountInput(item.amount, language: strings.language),
-      ),
-    );
-    if (values == null) return;
-    await run(
-      () => bridge.markPlannedPaid(
-        planId: item.id,
-        purchaseId: _newId(),
-        paidDate: values.date,
-        amount: values.amount,
-      ),
-    );
-  }
-}
-
-class _PlannedDialog extends StatefulWidget {
-  const _PlannedDialog({
-    required this.bridge,
-    required this.strings,
-    required this.today,
-    required this.firstDate,
-    required this.calendar,
-    required this.weekStart,
-    this.existing,
-  });
-
-  final PouchBridge bridge;
-  final AppStrings strings;
-  final String today;
-  final String firstDate;
-  final String calendar;
-  final int weekStart;
-  final PouchPlannedItem? existing;
-
-  @override
-  State<_PlannedDialog> createState() => _PlannedDialogState();
-}
-
-class _PlannedDialogState extends State<_PlannedDialog> {
-  late final _description = TextEditingController(
-    text: widget.existing?.description ?? '',
-  );
-  late final _amount = TextEditingController(
-    text: widget.existing == null
-        ? ''
-        : amountInput(
-            widget.existing!.amount,
-            language: widget.strings.language,
-          ),
-  );
-  late String _date = widget.existing?.date ?? widget.today;
-  late String _kind = widget.existing?.kind ?? 'expense';
-  late String _category = widget.existing?.category ?? 'other';
-
-  @override
-  void dispose() {
-    _description.dispose();
-    _amount.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.strings.text(widget.existing == null ? 'addPlan' : 'editPlan'),
-    ),
-    content: SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<String>(
-            initialValue: _kind,
-            decoration: InputDecoration(
-              labelText: widget.strings.text('plannedType'),
-            ),
-            items: ['expense', 'goal']
-                .map(
-                  (value) => DropdownMenuItem(
-                    value: value,
-                    child: Text(
-                      widget.strings.text(
-                        value == 'goal'
-                            ? 'savingsGoalType'
-                            : 'plannedExpenseType',
-                      ),
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-            onChanged: (value) => setState(() => _kind = value ?? 'expense'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _description,
-            maxLength: 120,
-            decoration: InputDecoration(
-              labelText: widget.strings.text('description'),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _amount,
-            inputFormatters: [
-              PouchMoneyInputFormatter(widget.strings.language),
-            ],
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: widget.strings.text('amount'),
-            ),
-          ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            initialValue: _category,
-            decoration: InputDecoration(
-              labelText: widget.strings.text('category'),
-            ),
-            items:
-                const [
-                      'other',
-                      'food',
-                      'transport',
-                      'shopping',
-                      'health',
-                      'entertainment',
-                      'bills',
-                    ]
-                    .map(
-                      (value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(widget.strings.text(value)),
-                      ),
-                    )
-                    .toList(growable: false),
-            onChanged: (value) => setState(() => _category = value ?? 'other'),
-          ),
-          const SizedBox(height: 10),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              widget.strings.text(_kind == 'goal' ? 'targetDate' : 'dueDate'),
-            ),
-            subtitle: PouchDateLabel(
-              bridge: widget.bridge,
-              strings: widget.strings,
-              date: _date,
-              calendar: widget.calendar,
-            ),
-            trailing: Icon(
-              Icons.calendar_month_rounded,
-              color: context.pouchPalette.goldDeep,
-            ),
-            onTap: () async {
-              final picked = await showPouchDatePicker(
-                context: context,
-                bridge: widget.bridge,
-                strings: widget.strings,
-                initialDate: _date,
-                calendar: widget.calendar,
-                weekStart: widget.weekStart,
-                firstDate: widget.firstDate,
-                lastDate: '9998-12-31',
-              );
-              if (picked != null) setState(() => _date = picked);
-            },
-          ),
-        ],
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: Text(widget.strings.text('cancel')),
-      ),
-      FilledButton(
-        onPressed: () => Navigator.pop(
-          context,
-          _PlannedValues(
-            _description.text,
-            _amount.text,
-            _category,
-            _kind,
-            _date,
-          ),
-        ),
-        child: Text(widget.strings.text('save')),
-      ),
-    ],
-  );
-}
-
-class _PaymentDialog extends StatefulWidget {
-  const _PaymentDialog({
-    required this.bridge,
-    required this.strings,
-    required this.today,
-    required this.firstDate,
-    required this.calendar,
-    required this.weekStart,
-    required this.amount,
-  });
-
-  final PouchBridge bridge;
-  final AppStrings strings;
-  final String today;
-  final String firstDate;
-  final String calendar;
-  final int weekStart;
-  final String amount;
-
-  @override
-  State<_PaymentDialog> createState() => _PaymentDialogState();
-}
-
-class _PaymentDialogState extends State<_PaymentDialog> {
-  late final _amount = TextEditingController(text: widget.amount);
-  late String _date = widget.today;
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.strings.text('recordPayment')),
-    content: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextField(
-          controller: _amount,
-          inputFormatters: [PouchMoneyInputFormatter(widget.strings.language)],
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: widget.strings.text('actualAmount'),
-          ),
-        ),
-        const SizedBox(height: 10),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(widget.strings.text('paymentDate')),
-          subtitle: PouchDateLabel(
+        if (_kind == 'expense') ...[
+          const SizedBox(height: 20),
+          EssentialExpenses(
             bridge: widget.bridge,
-            strings: widget.strings,
-            date: _date,
-            calendar: widget.calendar,
+            snapshot: widget.snapshot,
+            strings: strings,
+            today: widget.today,
+            run: widget.run,
           ),
-          trailing: const Icon(Icons.calendar_month_rounded),
-          onTap: () async {
-            final picked = await showPouchDatePicker(
-              context: context,
-              bridge: widget.bridge,
-              strings: widget.strings,
-              initialDate: _date,
-              calendar: widget.calendar,
-              weekStart: widget.weekStart,
-              firstDate: widget.firstDate,
-              lastDate: widget.today,
-            );
-            if (picked != null) setState(() => _date = picked);
-          },
-        ),
+          const SizedBox(height: 20),
+        ],
       ],
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: Text(widget.strings.text('cancel')),
-      ),
-      FilledButton(
-        onPressed: () =>
-            Navigator.pop(context, _PaymentValues(_date, _amount.text)),
-        child: Text(widget.strings.text('confirmPayment')),
-      ),
-    ],
+    );
+  }
+
+  Future<void> _editPlan([PouchPlannedItem? existing]) => editPlannedItem(
+    context: context,
+    bridge: widget.bridge,
+    snapshot: widget.snapshot,
+    strings: widget.strings,
+    today: widget.today,
+    run: widget.run,
+    initialPeriodId: selectedPouchPeriod(
+      widget.snapshot,
+      PouchPeriodScope.maybeOf(context)?.periodId ?? _periodId,
+    )?.id,
+    kind: _kind,
+    existing: existing,
+  );
+
+  Future<void> _deletePlan(PouchPlannedItem item) => deletePlannedItem(
+    context: context,
+    bridge: widget.bridge,
+    strings: widget.strings,
+    run: widget.run,
+    undo: widget.undo,
+    item: item,
   );
 }
-
-class _PlannedValues {
-  const _PlannedValues(
-    this.description,
-    this.amount,
-    this.category,
-    this.kind,
-    this.date,
-  );
-  final String description;
-  final String amount;
-  final String category;
-  final String kind;
-  final String date;
-}
-
-class _PaymentValues {
-  const _PaymentValues(this.date, this.amount);
-  final String date;
-  final String amount;
-}
-
-String _newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);

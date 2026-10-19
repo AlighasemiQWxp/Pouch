@@ -5,9 +5,31 @@ use serde::{Deserialize, Serialize};
 
 use crate::{PouchError, PouchResult, money::Money};
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(transparent)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Date(i32);
+
+impl Serialize for Date {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&self.iso().map_err(serde::ser::Error::custom)?)
+        } else {
+            serializer.serialize_i32(self.0)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Date {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        if deserializer.is_human_readable() {
+            let text = String::deserialize(deserializer)?;
+            Self::parse_iso(&text).map_err(serde::de::Error::custom)
+        } else {
+            let value = Self(i32::deserialize(deserializer)?);
+            value.to_naive_date().map_err(serde::de::Error::custom)?;
+            Ok(value)
+        }
+    }
+}
 
 impl Date {
     pub fn from_ymd(year: i32, month: u32, day: u32) -> PouchResult<Self> {
@@ -140,25 +162,60 @@ pub enum Currency {
     Nzd,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Recurrence {
+    Once,
+    Weekly,
+    Biweekly,
+    Monthly,
+    Custom(u16),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetPeriod {
+    pub id: String,
+    pub start: Date,
+    pub end: Date,
+    pub recurrence: Recurrence,
+    pub calendar: Calendar,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequiredExpense {
     pub id: String,
     pub name: String,
     pub amount: Money,
+    pub date: Date,
+    pub recurrence: Recurrence,
+    pub calendar: Calendar,
+    pub until: Option<Date>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BudgetPlan {
+    pub period_id: String,
     pub effective: Date,
-    pub fallback_salary: Option<Money>,
-    pub daily_budget: Money,
-    pub expenses: Vec<RequiredExpense>,
-    pub monthly_savings: Money,
-    pub payday: u8,
-    pub calendar: Calendar,
-    pub legacy: bool,
+    pub savings: Money,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavingsAllocation {
+    pub period_id: String,
+    pub date: Date,
+    pub amount: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomeReceipt {
+    pub income_id: String,
+    pub expected_date: Date,
+    pub expected_amount: Money,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -203,7 +260,6 @@ pub struct Purchase {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DailyRecord {
-    pub budget_override: Option<Money>,
     pub purchases: Vec<Purchase>,
 }
 
@@ -235,6 +291,7 @@ pub struct PlannedItem {
     pub status: PlannedStatus,
     pub paid_date: Option<Date>,
     pub purchase_id: Option<String>,
+    pub essential_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -243,16 +300,22 @@ pub struct AppState {
     pub schema_version: u16,
     pub start_date: Date,
     pub preferences: Preferences,
+    pub periods: Vec<BudgetPeriod>,
+    pub essentials: Vec<RequiredExpense>,
+    pub allocations: Vec<SavingsAllocation>,
+    pub receipts: Vec<IncomeReceipt>,
     pub income: Vec<IncomeEntry>,
     pub expected_income: Vec<ExpectedIncomeEntry>,
     pub plans: Vec<BudgetPlan>,
     pub days: BTreeMap<Date, DailyRecord>,
     pub planned: Vec<PlannedItem>,
     pub economic_assumptions: BTreeMap<String, crate::economics::Assumptions>,
+    #[serde(default)]
+    pub period_context: crate::periods::context::PeriodContext,
 }
 
 impl AppState {
-    pub const CURRENT_SCHEMA_VERSION: u16 = 3;
+    pub const CURRENT_SCHEMA_VERSION: u16 = 6;
 
     pub fn fresh(start_date: Date) -> Self {
         let preferences = Preferences::default();
@@ -262,38 +325,33 @@ impl AppState {
             preferences: preferences.clone(),
             income: Vec::new(),
             expected_income: Vec::new(),
-            plans: vec![BudgetPlan {
-                effective: start_date,
-                fallback_salary: None,
-                daily_budget: Money::default(),
-                expenses: Vec::new(),
-                monthly_savings: Money::default(),
-                payday: 1,
-                calendar: preferences.calendar,
-                legacy: false,
-            }],
+            periods: Vec::new(),
+            essentials: Vec::new(),
+            allocations: Vec::new(),
+            receipts: Vec::new(),
+            plans: Vec::new(),
             days: BTreeMap::new(),
             planned: Vec::new(),
             economic_assumptions: BTreeMap::new(),
+            period_context: crate::periods::context::PeriodContext::default(),
         }
     }
 
     pub(crate) fn include_record_date(&mut self, date: Date) {
         if date < self.start_date {
             self.start_date = date;
-            self.plans[0].effective = date;
         }
     }
 
     pub fn validate(&self) -> PouchResult<()> {
         crate::economics::validate_assumptions(&self.economic_assumptions)?;
         if self.schema_version != Self::CURRENT_SCHEMA_VERSION
-            || self.plans.is_empty()
-            || self.plans.len() > 1000
+            || self.plans.len() > 10_000
             || self.planned.len() > 100_000
+            || self.essentials.len() > 1000
+            || self.allocations.len() > 100_000
             || self.income.len() > 10_000
             || self.expected_income.len() > 10_000
-            || self.plans[0].effective != self.start_date
         {
             return Err(PouchError::InvalidState);
         }
@@ -302,64 +360,60 @@ impl AppState {
         if self.start_date > today {
             return Err(PouchError::InvalidState);
         }
+        crate::periods::validate(self)?;
+        crate::periods::context::validate(self)?;
+        let mut plan_keys = std::collections::BTreeSet::new();
         for plan in &self.plans {
-            plan.effective.to_naive_date()?;
-            if plan.effective < self.start_date
-                || plan.payday == 0
-                || plan.payday > 31
-                || !validate_optional_money(plan.fallback_salary)
-                || !validate_money(plan.daily_budget, false)
-                || !validate_money(plan.monthly_savings, false)
+            let period = crate::periods::at(self, plan.effective)?;
+            if plan.period_id != period.id
+                || !validate_money(plan.savings, false)
+                || !plan_keys.insert((&plan.period_id, plan.effective))
             {
                 return Err(PouchError::InvalidState);
             }
-            let mut expense_total = 0_i64;
-            let mut expense_ids = std::collections::BTreeSet::new();
-            for expense in &plan.expenses {
-                if expense.id.trim().is_empty()
-                    || expense.name.trim().is_empty()
-                    || expense.name.encode_utf16().count() > 120
-                    || !expense_ids.insert(expense.id.as_str())
-                    || !validate_money(expense.amount, true)
-                {
-                    return Err(PouchError::InvalidState);
-                }
-                expense_total = expense_total
-                    .checked_add(expense.amount.hundredths())
-                    .filter(|total| *total <= crate::money::MAX_HUNDREDTHS)
-                    .ok_or(PouchError::InvalidState)?;
+        }
+        let mut expense_ids = std::collections::BTreeSet::new();
+        for expense in &self.essentials {
+            expense.date.to_naive_date()?;
+            crate::periods::validate_recurrence(expense.recurrence)?;
+            if expense.id.trim().is_empty()
+                || !expense_ids.insert(&expense.id)
+                || expense.name.trim().is_empty()
+                || expense.name.encode_utf16().count() > 120
+                || !validate_money(expense.amount, true)
+                || expense.until.is_some_and(|date| date < expense.date)
+            {
+                return Err(PouchError::InvalidState);
+            }
+            if let Some(until) = expense.until {
+                until.to_naive_date()?;
             }
         }
-        if self
-            .plans
-            .windows(2)
-            .any(|plans| plans[0].effective >= plans[1].effective)
-        {
-            return Err(PouchError::InvalidState);
-        }
-        if self
-            .plans
-            .windows(2)
-            .any(|plans| plans[1].effective < self.start_date)
-        {
-            return Err(PouchError::InvalidState);
+        let mut allocation_keys = std::collections::BTreeSet::new();
+        for allocation in &self.allocations {
+            let period = crate::periods::at(self, allocation.date)?;
+            if allocation.date > today
+                || allocation.period_id != period.id
+                || allocation.amount.unsigned_abs() > 9_007_199_254_740_991
+                || !allocation_keys.insert((allocation.date, &allocation.period_id))
+            {
+                return Err(PouchError::InvalidState);
+            }
         }
         if self
             .income
             .windows(2)
-            .any(|income| income[0].date >= income[1].date)
+            .any(|income| income[0].date > income[1].date)
         {
             return Err(PouchError::InvalidState);
         }
         let mut income_ids = std::collections::BTreeSet::new();
-        let mut income_dates = std::collections::BTreeSet::new();
         for income in &self.income {
             income.date.to_naive_date()?;
             if income.date < self.start_date
                 || income.date > today
                 || income.id.trim().is_empty()
                 || !income_ids.insert(income.id.as_str())
-                || !income_dates.insert(income.date)
                 || !validate_money(income.amount, true)
             {
                 return Err(PouchError::InvalidState);
@@ -368,7 +422,7 @@ impl AppState {
         if self
             .expected_income
             .windows(2)
-            .any(|entries| entries[0].date >= entries[1].date)
+            .any(|entries| entries[0].date > entries[1].date)
         {
             return Err(PouchError::InvalidState);
         }
@@ -377,8 +431,20 @@ impl AppState {
             if income.date < self.start_date
                 || income.id.trim().is_empty()
                 || !income_ids.insert(income.id.as_str())
-                || !income_dates.insert(income.date)
                 || !validate_money(income.amount, true)
+            {
+                return Err(PouchError::InvalidState);
+            }
+        }
+        let mut receipt_ids = std::collections::BTreeSet::new();
+        for receipt in &self.receipts {
+            receipt.expected_date.to_naive_date()?;
+            if !receipt_ids.insert(&receipt.income_id)
+                || !self
+                    .income
+                    .iter()
+                    .any(|income| income.id == receipt.income_id)
+                || !validate_money(receipt.expected_amount, true)
             {
                 return Err(PouchError::InvalidState);
             }
@@ -391,7 +457,7 @@ impl AppState {
         let mut purchase_links = std::collections::BTreeSet::new();
         for (date, day) in &self.days {
             date.to_naive_date()?;
-            if !validate_optional_money(day.budget_override) {
+            if *date > today && !day.purchases.is_empty() {
                 return Err(PouchError::InvalidState);
             }
             let mut purchase_ids = std::collections::BTreeSet::new();
@@ -426,6 +492,12 @@ impl AppState {
                 || planned.description.trim().is_empty()
                 || planned.description.encode_utf16().count() > 120
                 || planned.date < self.start_date
+                || planned.essential_id.as_ref().is_some_and(|id| {
+                    planned.kind != PlannedKind::Expense
+                        || !expense_ids.contains(id)
+                        || planned.id != format!("essential/{}/{}", id, planned.date.day_offset())
+                })
+                || (planned.essential_id.is_none() && planned.id.starts_with("essential/"))
                 || !planned_ids.insert(planned.id.as_str())
                 || !validate_money(planned.amount, true)
             {
@@ -482,8 +554,4 @@ fn validate_money(value: Money, positive: bool) -> bool {
     let amount = value.hundredths();
     let minimum = if positive { 1 } else { 0 };
     amount >= minimum && amount <= crate::money::MAX_HUNDREDTHS
-}
-
-fn validate_optional_money(value: Option<Money>) -> bool {
-    value.is_none_or(|amount| validate_money(amount, false))
 }

@@ -6,6 +6,7 @@ import '../../core/pouch_formatters.dart';
 import '../../core/pouch_models.dart';
 import '../../widgets/pouch_widgets.dart';
 import '../../widgets/pouch_date_picker.dart';
+import '../../widgets/pouch_period_selector.dart';
 import 'forecast_metric.dart';
 import 'standard_forecast_section.dart';
 
@@ -34,14 +35,18 @@ class FinancialForecastScreen extends StatefulWidget {
 
 class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
   String? _selectedId;
+  String? _periodId;
+  String? _standardSelectedId;
+  PouchPeriodView? _periodView;
+  int _periodRequest = 0;
   bool _incomeRequired = false;
   bool _countryExpanded = false;
   Future<_ForecastView>? _recorded;
   Future<_ForecastView>? _recommended;
 
   List<PouchPlannedItem> get _targets =>
-      widget.snapshot.planned
-          .where((item) => item.status == 'pending' && item.amount > 0)
+      (_periodView?.targets ?? <PouchPlannedItem>[])
+          .where((item) => item.amount > 0)
           .toList()
         ..sort((a, b) {
           final dateOrder = a.date.compareTo(b.date);
@@ -56,6 +61,16 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final shared = PouchPeriodScope.maybeOf(context)?.periodId;
+    if (shared != null && shared != _periodId) {
+      _periodId = shared;
+      _loadSelectedPeriod();
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant FinancialForecastScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.snapshot != widget.snapshot ||
@@ -67,18 +82,48 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
   }
 
   void _refresh() {
-    final targets = _targets;
-    if (!targets.any((item) => item.id == _selectedId)) {
-      _selectedId = targets.firstOrNull?.id;
+    if (!widget.snapshot.periods.any((period) => period.id == _periodId)) {
+      _periodId =
+          widget.snapshot.currentPeriod?.id ??
+          widget.snapshot.periods.lastOrNull?.id;
     }
-    final id = _selectedId;
-    if (id == null) {
-      _recorded = null;
-      _recommended = null;
-      return;
+    final standardTargets = widget.snapshot.planned.where(
+      (item) => item.status == 'pending',
+    );
+    if (!standardTargets.any((item) => item.id == _standardSelectedId)) {
+      _standardSelectedId = standardTargets.firstOrNull?.id;
     }
-    _recorded = _calculate(id, false);
-    _recommended = _calculate(id, true);
+    _loadSelectedPeriod();
+  }
+
+  Future<void> _loadSelectedPeriod() async {
+    final request = ++_periodRequest;
+    final period = widget.snapshot.periods
+        .where((item) => item.id == _periodId)
+        .firstOrNull;
+    _periodView = null;
+    _recorded = null;
+    _recommended = null;
+    if (period == null) return;
+    try {
+      final view = await widget.bridge.periodView(period.start);
+      if (!mounted || request != _periodRequest) return;
+      setState(() {
+        _periodView = view;
+        if (!_targets.any((item) => item.id == _selectedId)) {
+          _selectedId = _targets.firstOrNull?.id;
+        }
+        final id = _selectedId;
+        if (id != null) {
+          _recorded = _calculate(id, false);
+          _recommended = _calculate(id, true);
+        }
+      });
+    } catch (_) {
+      if (mounted && request == _periodRequest) {
+        setState(() => _periodView = null);
+      }
+    }
   }
 
   Future<_ForecastView> _calculate(String id, bool recommended) async {
@@ -90,6 +135,7 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
       id,
       recommended: recommended,
       incomeRequired: recommended && _incomeRequired,
+      periodId: _periodId,
     );
     String? date;
     if (value.completionDate != null) {
@@ -111,6 +157,12 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
     final targets = _targets;
     final id = _selectedId;
     final target = targets.where((item) => item.id == id).firstOrNull;
+    final period = widget.snapshot.periods
+        .where((item) => item.id == _periodId)
+        .firstOrNull;
+    final standardTargets = widget.snapshot.planned
+        .where((item) => item.status == 'pending')
+        .toList();
     return PouchPage(
       children: [
         PouchIntro(
@@ -118,6 +170,25 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
           title: strings.text('forecastTitle'),
           description: strings.text('forecastPageHint'),
         ),
+        PouchPeriodSelector(
+          periods: widget.snapshot.periods,
+          selectedId: _periodId,
+          strings: strings,
+          label: strings.text('personalForecastPeriod'),
+          onChanged: (id) {
+            setState(() {
+              _periodId = id;
+              _loadSelectedPeriod();
+            });
+            PouchPeriodScope.maybeOf(context)?.onChanged(id);
+          },
+        ),
+        const SizedBox(height: 16),
+        if (period == null)
+          PouchEmptyState(
+            title: strings.text('chooseHorizon'),
+            message: strings.text('forecastPeriodHint'),
+          ),
         if (target == null)
           PouchCard(
             child: Column(
@@ -147,12 +218,10 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
                   ),
                   items: targets
                       .map((item) {
-                        var kind = 'plannedExpenseType';
-                        if (item.kind == 'goal') kind = 'savingsGoalType';
                         return DropdownMenuItem(
                           value: item.id,
                           child: Text(
-                            '${item.description} · ${strings.text(kind)} · ${_money(item.amount)}',
+                            item.description,
                             overflow: TextOverflow.ellipsis,
                           ),
                         );
@@ -160,7 +229,10 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
                       .toList(growable: false),
                   onChanged: (value) => setState(() {
                     _selectedId = value;
-                    _refresh();
+                    if (value != null) {
+                      _recorded = _calculate(value, false);
+                      _recommended = _calculate(value, true);
+                    }
                   }),
                 ),
                 const SizedBox(height: 8),
@@ -198,28 +270,133 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
               children: [_section(true)],
             ),
           ),
-          const SizedBox(height: 14),
+        ],
+        const SizedBox(height: 20),
+        if (period != null)
           PouchCard(
             child: ExpansionTile(
+              key: const ValueKey('forecast-budget-details'),
               tilePadding: EdgeInsets.zero,
-              title: Text(strings.text('forecastCompareCountry')),
-              onExpansionChanged: (expanded) {
-                setState(() => _countryExpanded = expanded);
-              },
+              title: Text(strings.text('forecastBudgetDetails')),
               children: [
-                if (_countryExpanded)
-                  StandardForecastSection(
-                    bridge: widget.bridge,
-                    snapshot: widget.snapshot,
-                    strings: strings,
-                    today: widget.today,
-                    selectedId: target.id,
-                    run: widget.run,
+                PouchCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: 12,
+                        children: [
+                          PouchDateLabel(
+                            bridge: widget.bridge,
+                            strings: strings,
+                            date: period.start,
+                            calendar: widget.snapshot.preferences.calendar,
+                          ),
+                          PouchDateLabel(
+                            bridge: widget.bridge,
+                            strings: strings,
+                            date: period.end,
+                            calendar: widget.snapshot.preferences.calendar,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(strings.text('forecastPeriodHint')),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                PouchStatGrid(
+                  children: [
+                    PouchStat(
+                      label: strings.text('receivedIncome'),
+                      value: _money(period.income),
+                    ),
+                    PouchStat(
+                      label: strings.text('freeToSpend'),
+                      value: _money(period.remaining),
+                    ),
+                    PouchStat(
+                      label: strings.text('reservedExpenses'),
+                      value: _money(period.fundedExpenses),
+                    ),
+                    PouchStat(
+                      label: strings.text('protectedSavings'),
+                      value: _money(period.savings),
+                    ),
+                  ],
+                ),
+                if (period.status == 'closed' || period.status == 'expired')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: PouchCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            strings.text('historicalResults'),
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(
+                            '${strings.text('totalSpent')}: ${_money(period.expenses)}',
+                          ),
+                          Text(
+                            '${strings.text('plannedSavings')}: ${_money(period.plannedSavings)}',
+                          ),
+                          Text(
+                            '${strings.text('savedThisPeriod')}: ${_money(period.contributedSavings)}',
+                          ),
+                          Text(strings.text('historicalForecastHint')),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
               ],
             ),
           ),
-        ],
+        const SizedBox(height: 16),
+        PouchCard(
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(strings.text('forecastCompareCountry')),
+            onExpansionChanged: (expanded) =>
+                setState(() => _countryExpanded = expanded),
+            children: [
+              if (standardTargets.isEmpty) Text(strings.text('forecastEmpty')),
+              if (standardTargets.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  key: ValueKey(_standardSelectedId),
+                  initialValue: _standardSelectedId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: strings.text('forecastSelect'),
+                  ),
+                  items: [
+                    for (final item in standardTargets)
+                      DropdownMenuItem(
+                        value: item.id,
+                        child: Text(
+                          item.description,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => _standardSelectedId = value),
+                ),
+              if (_countryExpanded && _standardSelectedId != null)
+                StandardForecastSection(
+                  bridge: widget.bridge,
+                  snapshot: widget.snapshot,
+                  strings: strings,
+                  today: widget.today,
+                  selectedId: _standardSelectedId!,
+                  run: widget.run,
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -303,7 +480,7 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
       if (incomeRequired)
         _metric('forecastIncome', _optionalMoney(value.requiredIncome))
       else
-        _metric('forecastRecordedIncome', _money(value.monthlyIncome)),
+        _metric('forecastRecordedIncome', _money(value.periodIncome)),
       _metric('forecastEssential', _money(value.essentialExpenses)),
       if (recommended)
         _metric('forecastControllable', _money(value.controllableSpending)),
@@ -366,7 +543,7 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
             if (!recommended || incomeRequired)
               _metric(
                 'forecastMonthlySaving',
-                _optionalMoney(value.monthlySaving),
+                _optionalMoney(value.periodSaving),
               ),
             _metric('forecastAllocated', _money(value.allocated)),
             _metric('forecastRemaining', _money(value.remaining)),

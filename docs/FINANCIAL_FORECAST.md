@@ -1,31 +1,28 @@
 # Financial Forecast
 
-Financial Forecast is a main navigation page with an eye icon, labeled **پیش‌بینی مالی** in Persian. `flutter/lib/features/forecast` owns all forecast presentation. Planned Expenses owns target creation, editing, amounts, dates, payment actions and current allocation labels. It has no completion estimates or forecast controls. When no pending positive-amount targets exist, the forecast page offers a button opening Planned Expenses.
+Rust owns forecasting, amounts, dates, allocations, assumptions, and validation. Flutter owns selectors, presentation, localization, and temporary loading state. Queries never change records, storage, revision, or undo history.
 
-## Target and progressive disclosure
+## Personal period selection
 
-The drawer order is Today, Budget Plan, Planned Expenses, Financial Forecast, Reports, Settings & Data, About.
+Personal Forecast places a named period selector at the top, defaulting to the active period. Its selection is shared with Budget Plan, Today, and Plans, with a short calculation-context explanation beneath each selector. Today keeps its selected calendar date. Rust supplies the same period summaries used by Budget Plan: actual received income, spending, carried free funds, reserved expenses, protected savings, and dates. Rust also supplies the targets pending at the period's inspection date and associated with that period, including targets due outside its date range. Existing unassigned targets keep their prior visibility. Actual cash always follows receipt/payment dates; assigning income to a period never creates or duplicates money. Historical inspection uses the last included day; future inspection uses the first day.
 
-One selector shows pending goals and expenses in deadline/ID order. The selected name, remaining amount and calendar deadline are visible. All forecast views use the same target.
+Historical periods show actual spending, planned minimum savings, actual period savings contributions, and closing balances. An optional target projection is explicitly a scenario from that historical closing date. It does not rewrite history.
 
-The initial page shows **Your current forecast**: estimated completion days/date and deadline status. Income, essential costs, everyday spending, configured savings, affordable contribution, deadline saving requirements, allocations and assumptions are inside **How this is calculated**.
+Daily discretionary spending uses observed purchases per elapsed day, or the Rust-funded recommendation when there is no spending history. Linked bill/goal payments are excluded from discretionary spending. Existing allocations are shared once in deadline/ID order, and reservations remain distinct from actual payments.
 
-**Explore improvements** starts collapsed. Its selector offers:
+Opening free cash is available once during the remaining horizon. Projections beyond that horizon assume a similar rate of actually received period income, unchanged spending and commitments, and no repeated opening balance. A missing expected payment creates no income. Insufficient capacity produces an unavailable completion estimate rather than invented money.
 
-- **Spend a little less**: preserves recorded income and essential costs while previewing a 10% reduction in everyday spending, rounded upward. Users are asked to consider this only when everyday needs remain covered.
-- **Income needed to meet the deadline**: keeps current everyday spending and computes the income needed for all pending deadlines and the configured savings minimum. The required income is visible alongside completion. It uses no national salary data. If an unfunded deadline has passed, no finite required income/completion is invented.
+Explore improvements offers a read-only 10% reduction in everyday spending or hypothetical additional income needed for outstanding commitments. An unfunded overdue deadline has no finite required-income answer. Hypothetical income does not increase actual allocations or spending recommendations.
 
-**Compare with another country** starts collapsed and initializes the Standard Forecast only while opened. It contains country selection, benchmark results, optional customization, refresh controls and expandable sources/assumptions. The country comparison evaluates the selected target's remaining amount using country benchmark income and saving capacity.
+## Independent Standard Forecast
 
-Metric grids collapse to one column on narrow screens. Completion dates use DD/MM/YYYY in the selected Gregorian/Jalali calendar, with localized Persian digits and RTL. Previews do not change the financial plan; saving or resetting optional country assumptions retains the existing explicit customization behavior.
+Country comparison keeps its own target selector and always uses today. Selecting a personal period or personal target does not change its inputs or trigger a country reload. Existing country providers, benchmarks, monthly methodology, exchange conversion, customization, refresh/error handling, offline cache, and source disclosures remain maintained.
 
-## Calculation and data ownership
+Country results estimate the selected target's remaining allocation using the existing benchmark methodology. They do not apply the personal period's horizon or repeat a rollover balance. Provider details and limitations remain in [Economic Profiles](ECONOMIC_PROFILES.md).
 
-Rust owns all financial calculations, completion/extra days and comparisons. Flutter owns target/income-basis selection, localization and layout. `forecast::preview` is read-only; it never changes the financial plan, storage, revision, backup or undo history. Expected income cannot fund the recorded or recommended plan. Hypothetical required income is only a preview.
+## Presentation
 
-Allocation pools are computed before proposed spending or income is applied, so switching income basis preserves the same existing allocations. Each savings/expense pool is allocated once by deadline/ID. Completion includes earlier outstanding targets of the same kind and protects the other pool's deadline commitments. Country comparison independently evaluates the selected target and does not fund earlier targets a second time.
-
-Amounts describe the current income cycle; they are not forcibly converted into a fixed 30-day month. Required contribution may exceed the configured contribution, and completion may therefore be late or unavailable. Fully allocated targets complete today. A proposed spending reduction is an assumption rather than an automatic plan change.
+Desktop uses persistent navigation; mobile uses a compact bar and More sheet. Personal summaries precede target projections. Improvements and country comparisons are progressively disclosed. Responsive metrics, local Gregorian/Jalali dates, localized digits, English LTR and Persian RTL are shared with the application design system.
 
 ## Iran retrieval
 
@@ -35,36 +32,6 @@ The adapter now follows at most four HTTPS redirects within `amar.org.ir` and `w
 
 ## Manual validation
 
-No bridge generation, compilation, formatter, lint, test or build was run for this change. The typed Rust forecast signature and snapshot changed. **Regenerate the bridge before analyzing or compiling.** Existing generated adapters are intentionally left for the manual generator.
+Bindings were generated with the installed Flutter Rust Bridge generator in source-parsing mode, without compilation. This proves generation only; it does not establish Rust type correctness or runtime integration. Follow the exact commands and acceptance sequence in [Desktop validation](DESKTOP.md#explicit-period-redesign-validation).
 
-```powershell
-Set-Location F:\Projects\Rust\Pouch\flutter
-flutter_rust_bridge_codegen generate
-Set-Location ..
-cargo fmt --manifest-path rust/Cargo.toml
-cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path rust/Cargo.toml
-Set-Location flutter
-dart format lib/main.dart lib/core/pouch_bridge.dart lib/core/pouch_models.dart lib/features/planned/planned_screen.dart lib/features/forecast test/forecast_metric_test.dart
-flutter analyze
-flutter test
-Set-Location ..
-.\validate-and-build.ps1
-```
-
-Use `validate-and-build-windows.ps1` or `validate-and-build-linux.sh` for the corresponding desktop runner.
-
-After validation, check:
-
-- Drawer order, eye navigation, no duplicate forecasts in Planned Expenses, allocation labels, and empty-state navigation.
-- Initially collapsed improvements, country comparison and calculation details; completion/deadline status; remaining amount; both improvement choices; country controls after closing and reopening.
-- Expense/goal selection, long names, partially funded goals and earlier commitments. All sections must select the same target, including rapid changes while requests are pending.
-- Both improvement choices, zero/unreceived income, insufficient savings, overdue/fully funded targets and unchanged allocations across previews.
-- Recorded/recommended completion days, date, extra days and comparison. A 10% spending reduction must be clearly optional; essential expenses stay fixed.
-- Iran refresh on the target device, failure messages, cached offline data and preserved custom overrides. Verify all other countries and currency pairs still work.
-- English/Persian, Gregorian/Jalali, narrow Android, desktop and short-window drawer scrolling.
-- Unchanged saved financial records, backup compatibility and undo history after read-only forecast actions.
-
-Added Rust regression cases cover recommendation allocation/essential-cost preservation, required-income previews with earlier commitments, overdue requirements, the reviewed Iran HTML shape, optional ezafe and distinct invalid year/unit/value/format failures. Flutter metric-grid tests also cover narrow/wide layouts and both text directions. These tests await manual execution.
-
-The immediate SCI certificate-chain and error-category fix is documented in [Economic Profiles](ECONOMIC_PROFILES.md#temporary-sci-transport-workaround). The planned structured Iran dataset migration remains pending separate approval.
+Check personal historical/current/future period selection, pending-at-date targets, empty/expired periods, paid targets, recorded/recommended scenarios, required-income failures, and rapid selector changes. Confirm Standard Forecast keeps its own target/country and uses today. Compare backups and revisions before/after read-only previews. Verify the country refresh, cache, custom assumptions, and provider failure behavior alongside calendar/locale switching.

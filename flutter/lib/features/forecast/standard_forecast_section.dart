@@ -210,7 +210,7 @@ class _StandardForecastSectionState extends State<StandardForecastSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PouchSectionHeading(title: strings.text('standardTitle')),
+        Text(strings.text('standardIndependentHint')),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           key: ValueKey('$_country:${_countries.length}'),
@@ -246,32 +246,38 @@ class _StandardForecastSectionState extends State<StandardForecastSection> {
         if (_error != null) PouchInlineError(strings.text(_error!)),
         if (value != null) ..._results(value),
         if (_country.isNotEmpty)
-          Wrap(
-            spacing: 8,
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(strings.text('scenarioSettings')),
             children: [
-              if (_countries.any(
-                (item) => item.code == _country && item.automatic,
-              ))
-                TextButton.icon(
-                  onPressed: _refreshing ? null : () => _load(force: true),
-                  icon: const Icon(Icons.refresh),
-                  label: Text(strings.text('standardRefresh')),
-                ),
-              TextButton.icon(
-                onPressed: _loading ? null : _customize,
-                icon: const Icon(Icons.tune),
-                label: Text(strings.text('standardCustomize')),
+              Wrap(
+                spacing: 8,
+                children: [
+                  if (_countries.any(
+                    (item) => item.code == _country && item.automatic,
+                  ))
+                    TextButton.icon(
+                      onPressed: _refreshing ? null : () => _load(force: true),
+                      icon: const Icon(Icons.refresh),
+                      label: Text(strings.text('standardRefresh')),
+                    ),
+                  TextButton.icon(
+                    onPressed: _loading ? null : _customize,
+                    icon: const Icon(Icons.tune),
+                    label: Text(strings.text('standardCustomize')),
+                  ),
+                  if (value?.customized == true)
+                    TextButton(
+                      onPressed: () async {
+                        final saved = await widget.run(
+                          () => widget.bridge.resetEconomicProfile(_country),
+                        );
+                        if (saved && mounted) await _load();
+                      },
+                      child: Text(strings.text('standardUseAutomatic')),
+                    ),
+                ],
               ),
-              if (value?.customized == true)
-                TextButton(
-                  onPressed: () async {
-                    final saved = await widget.run(
-                      () => widget.bridge.resetEconomicProfile(_country),
-                    );
-                    if (saved && mounted) await _load();
-                  },
-                  child: Text(strings.text('standardUseAutomatic')),
-                ),
             ],
           ),
       ],
@@ -470,7 +476,7 @@ class _StandardForecastSectionState extends State<StandardForecastSection> {
     }
     var saving = false;
     try {
-      await showDialog<void>(
+      final route = DialogRoute<void>(
         context: context,
         builder: (context) => StatefulBuilder(
           builder: (context, update) {
@@ -568,6 +574,8 @@ class _StandardForecastSectionState extends State<StandardForecastSection> {
           },
         ),
       );
+      await Navigator.of(context, rootNavigator: true).push(route);
+      await route.completed;
     } finally {
       income.dispose();
       essential.dispose();

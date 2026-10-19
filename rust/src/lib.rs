@@ -13,6 +13,8 @@ pub mod income;
 
 pub mod models;
 pub mod money;
+pub mod pagination;
+pub mod periods;
 pub mod preferences;
 pub mod purchases;
 pub mod reports;

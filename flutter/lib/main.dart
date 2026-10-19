@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -16,6 +16,9 @@ import 'features/forecast/financial_forecast_screen.dart';
 import 'features/preferences/preferences_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/today/today_screen.dart';
+import 'widgets/pouch_app_shell.dart';
+import 'widgets/pouch_motion.dart';
+import 'widgets/pouch_period_selector.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +26,14 @@ Future<void> main() async {
     await initializeDateFormatting('en');
     await initializeDateFormatting('fa');
     await initializePouchCore();
+    await _openApplication();
+  } catch (error) {
+    runApp(PouchStartupFailure(error: error.toString()));
+  }
+}
+
+Future<void> _openApplication() async {
+  try {
     final bridge = PouchBridge();
     final snapshot = await bridge.open();
     final today = await bridge.today();
@@ -66,19 +77,21 @@ class _PouchApplicationState extends State<PouchApplication>
     with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late PouchSnapshot _snapshot = widget.initialSnapshot;
   late AppStrings _strings = widget.initialStrings;
   late String _today = widget.initialToday;
-  late String _selectedDate = widget.initialToday;
   late String _themeStyle = widget.initialThemeStyle;
   AppPage _page = AppPage.today;
+  String? _selectedDay;
+  String? _selectedPeriodId;
   bool _working = false;
+  Timer? _clock;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) => _refreshToday());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_snapshot.imported) _showMessage('recordsImported');
@@ -88,6 +101,7 @@ class _PouchApplicationState extends State<PouchApplication>
 
   @override
   void dispose() {
+    _clock?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -101,10 +115,12 @@ class _PouchApplicationState extends State<PouchApplication>
     try {
       final today = await widget.bridge.today();
       if (!mounted || today == _today) return;
+      final snapshot = await widget.bridge.snapshot();
+      if (!mounted) return;
       setState(() {
-        final wasFollowingToday = _selectedDate == _today;
+        if (_selectedDay == _today) _selectedDay = null;
         _today = today;
-        if (wasFollowingToday) _selectedDate = today;
+        _snapshot = snapshot;
       });
     } catch (_) {}
   }
@@ -149,11 +165,18 @@ class _PouchApplicationState extends State<PouchApplication>
 
   String _errorKey(Object error) {
     final message = error.toString().toLowerCase();
+    if (message.contains('already starts')) return 'periodAlreadyStarts';
+    if (message.contains('outside a period')) return 'periodContainsPlan';
+    if (message.contains('non-overlapping') ||
+        message.contains('planning horizon')) {
+      return 'invalidPeriod';
+    }
     if (message.contains('currency')) return 'currencyLocked';
     if (message.contains('amount')) return 'invalidAmount';
     if (message.contains('report')) return 'invalidReport';
     if (message.contains('newer app version') ||
-        message.contains('storage format version')) {
+        message.contains('storage format version') ||
+        message.contains('development data format is incompatible')) {
       return 'unsupportedStorageVersion';
     }
     if (message.contains('recovery copy')) return 'noRecovery';
@@ -191,11 +214,8 @@ class _PouchApplicationState extends State<PouchApplication>
     );
   }
 
-  Future<void> _selectPage(AppPage page) async {
-    _scaffoldKey.currentState?.closeDrawer();
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    if (!mounted) return;
-    setState(() => _page = page);
+  void _selectPage(AppPage page) {
+    if (mounted) setState(() => _page = page);
   }
 
   Future<void> _setThemeStyle(String style) async {
@@ -212,234 +232,22 @@ class _PouchApplicationState extends State<PouchApplication>
     supportedLocales: const [Locale('en'), Locale('fa')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     scaffoldMessengerKey: _messengerKey,
-    home: Scaffold(
-      key: _scaffoldKey,
-      appBar: _buildAppBar(),
-      drawer: _buildDrawer(),
-      body: Stack(
-        children: [
-          _buildPage(),
-          if (_working)
-            const Align(
-              alignment: Alignment.topCenter,
-              child: LinearProgressIndicator(minHeight: 2),
-            ),
-        ],
+    builder: (context, child) =>
+        PouchMotion(child: child ?? const SizedBox.shrink()),
+    home: PouchAppShell(
+      page: _page,
+      strings: _strings,
+      working: _working,
+      onSelect: _selectPage,
+      onLanguage: () =>
+          _setLanguage(_snapshot.preferences.language == 'en' ? 'fa' : 'en'),
+      child: PouchPeriodScope(
+        periodId: selectedPouchPeriod(_snapshot, _selectedPeriodId)?.id,
+        onChanged: (id) => setState(() => _selectedPeriodId = id),
+        child: _buildPage(),
       ),
     ),
   );
-
-  PreferredSizeWidget _buildAppBar() {
-    final palette = PouchPalette.forStyle(_themeStyle);
-    return AppBar(
-      toolbarHeight: 76,
-      leadingWidth: 60,
-      leading: Builder(
-        builder: (context) => IconButton(
-          tooltip: _strings.text('menu'),
-          onPressed: () => Scaffold.of(context).openDrawer(),
-          icon: const Icon(Icons.menu_rounded),
-        ),
-      ),
-      titleSpacing: 0,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset('assets/pouch-icon.png', width: 38, height: 38),
-          ),
-          const SizedBox(width: 10),
-          const Text(
-            'Pouch',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(width: 10),
-          _PouchCoin(color: palette.goldBright),
-        ],
-      ),
-      actions: _buildAppBarActions(),
-    );
-  }
-
-  List<Widget> _buildAppBarActions() {
-    final palette = PouchPalette.forStyle(_themeStyle);
-    final width = MediaQuery.sizeOf(context).width;
-    if (width < 600) {
-      return [
-        TextButton(
-          onPressed: () => _setLanguage(
-            _snapshot.preferences.language == 'en' ? 'fa' : 'en',
-          ),
-          style: TextButton.styleFrom(
-            foregroundColor: palette.goldDeep,
-            minimumSize: const Size(48, 40),
-          ),
-          child: Text(
-            _snapshot.preferences.language == 'en' ? 'فا' : 'EN',
-            style: TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        if (width >= 400)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 10),
-            child: Tooltip(
-              message: _strings.text('local'),
-              child: Icon(
-                Icons.offline_pin_rounded,
-                color: palette.goldBright,
-                size: 21,
-              ),
-            ),
-          ),
-      ];
-    }
-    return [
-      Container(
-        margin: const EdgeInsetsDirectional.only(end: 8),
-        decoration: BoxDecoration(
-          color: palette.surface,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            _languageButton('en', 'English', palette),
-            _languageButton('fa', 'فارسی', palette),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsetsDirectional.only(end: 12),
-        child: Tooltip(
-          message: _strings.text('local'),
-          child: Icon(
-            Icons.offline_pin_rounded,
-            color: palette.goldBright,
-            size: 21,
-          ),
-        ),
-      ),
-    ];
-  }
-
-  Widget _languageButton(String language, String label, PouchPalette palette) =>
-      TextButton(
-        onPressed: _snapshot.preferences.language == language
-            ? null
-            : () => _setLanguage(language),
-        style: TextButton.styleFrom(
-          minimumSize: const Size(0, 38),
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          foregroundColor: _snapshot.preferences.language == language
-              ? Colors.white
-              : palette.muted,
-          backgroundColor: _snapshot.preferences.language == language
-              ? palette.goldDeep
-              : Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      );
-
-  Widget _buildDrawer() {
-    final palette = PouchPalette.forStyle(_themeStyle);
-    return Drawer(
-      width: 340,
-      backgroundColor: palette.surface,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(13),
-                    child: Image.asset(
-                      'assets/pouch-icon.png',
-                      width: 42,
-                      height: 42,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Pouch',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: _strings.text('closeMenu'),
-                    onPressed: () => _scaffoldKey.currentState?.closeDrawer(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: palette.border),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 22, 18, 10),
-              child: Text(
-                _strings.text('drawerLabel').toUpperCase(),
-                style: TextStyle(
-                  color: palette.muted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  for (final page in AppPage.values)
-                    ListTile(
-                      selected: page == _page,
-                      selectedTileColor: palette.selection,
-                      leading: Icon(
-                        _pageIcon(page),
-                        color: page == _page ? palette.gold : palette.muted,
-                      ),
-                      title: Text(_pageTitle(page)),
-                      onTap: () => _selectPage(page),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                      ),
-                      minVerticalPadding: 12,
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
-              child: Text(
-                _strings.text('drawerHint'),
-                style: TextStyle(
-                  color: palette.muted,
-                  fontSize: 12,
-                  height: 1.7,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildPage() {
     switch (_page) {
@@ -449,11 +257,13 @@ class _PouchApplicationState extends State<PouchApplication>
           snapshot: _snapshot,
           strings: _strings,
           today: _today,
-          selectedDate: _selectedDate,
           working: _working,
-          onDateChanged: (date) => setState(() => _selectedDate = date),
-          run: _run,
+          selectedDate: _selectedDay ?? _today,
+          onDateChanged: (date) => setState(() => _selectedDay = date),
           undo: _undoLastChange,
+          onOpenBudget: () => _selectPage(AppPage.budget),
+          onOpenPlanned: () => _selectPage(AppPage.planned),
+          run: _run,
         );
       case AppPage.planned:
         return PlannedScreen(
@@ -498,112 +308,12 @@ class _PouchApplicationState extends State<PouchApplication>
           run: _run,
           themeStyle: _themeStyle,
           onThemeStyleChanged: _setThemeStyle,
+          onOpenAbout: () => _selectPage(AppPage.about),
         );
       case AppPage.about:
         return AboutScreen(bridge: widget.bridge, strings: _strings);
     }
   }
-
-  String _pageTitle(AppPage page) {
-    return _strings.text(switch (page) {
-      AppPage.today => 'navToday',
-      AppPage.planned => 'navPlanned',
-      AppPage.forecast => 'forecastTitle',
-      AppPage.reports => 'navReports',
-      AppPage.budget => 'navBudget',
-      AppPage.preferences => 'navPreferences',
-      AppPage.about => 'navAbout',
-    });
-  }
-
-  IconData _pageIcon(AppPage page) {
-    return switch (page) {
-      AppPage.today => Icons.today_rounded,
-      AppPage.planned => Icons.event_note_rounded,
-      AppPage.forecast => Icons.visibility_rounded,
-      AppPage.reports => Icons.insights_rounded,
-      AppPage.budget => Icons.account_balance_wallet_rounded,
-      AppPage.preferences => Icons.tune_rounded,
-      AppPage.about => Icons.info_outline_rounded,
-    };
-  }
-}
-
-enum AppPage { today, budget, planned, forecast, reports, preferences, about }
-
-class _PouchCoin extends StatefulWidget {
-  const _PouchCoin({required this.color});
-
-  final Color color;
-
-  @override
-  State<_PouchCoin> createState() => _PouchCoinState();
-}
-
-class _PouchCoinState extends State<_PouchCoin>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _rotation = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 4),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _rotation.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _rotation,
-    builder: (context, _) {
-      final angle = _rotation.value * 2 * math.pi;
-      final front = _rotation.value < 0.5;
-      return Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.002)
-          ..rotateY(angle),
-        child: Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF8B4513), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xCC8B4513),
-                spreadRadius: 1.5,
-                blurRadius: 1,
-                offset: const Offset(0, 1),
-              ),
-            ],
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                widget.color,
-                const Color(0xFFE49A25),
-                const Color(0xFFFFC94D),
-              ],
-            ),
-          ),
-          child: Container(
-            margin: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFFFF0BA), width: 1),
-            ),
-            child: Icon(
-              front ? Icons.attach_money_rounded : Icons.savings_outlined,
-              size: 15,
-              color: const Color(0xFF75400D),
-            ),
-          ),
-        ),
-      );
-    },
-  );
 }
 
 class PouchStartupFailure extends StatelessWidget {
@@ -642,6 +352,13 @@ class PouchStartupFailure extends StatelessWidget {
                     color: PouchPalette.forStyle('classic').muted,
                   ),
                 ),
+                if (error.contains('development data format is incompatible'))
+                  Builder(
+                    builder: (context) => FilledButton(
+                      onPressed: () => _reset(context),
+                      child: const Text('Start a new budget / شروع بودجه جدید'),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -649,4 +366,35 @@ class PouchStartupFailure extends StatelessWidget {
       ),
     ),
   );
+  Future<void> _reset(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start a new budget / شروع بودجه جدید'),
+        content: const Text(
+          'Archive incompatible local data and start an empty budget? Original files will be kept in the app data folder.\nداده‌های ناسازگار بایگانی شوند و بودجه خالی آغاز شود؟ فایل‌های اصلی در پوشه داده‌های برنامه حفظ می‌شوند.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel / انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reset / بازنشانی'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await PouchBridge().resetIncompatibleStorage();
+      await _openApplication();
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
 }

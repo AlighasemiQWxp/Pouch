@@ -11,11 +11,11 @@ pub struct FinancialForecast {
     pub configured_savings: i64,
     pub extra_days: Option<i32>,
     pub faster_days: Option<i32>,
-    pub monthly_income: i64,
+    pub period_income: i64,
     pub daily_allowance: i64,
     pub required_income: Option<i64>,
     pub daily_limit: i64,
-    pub monthly_saving: Option<i64>,
+    pub period_saving: Option<i64>,
     pub income_gap: Option<i64>,
     pub spending_reduction: i64,
     pub allocated: i64,
@@ -73,7 +73,7 @@ pub fn preview(
         true,
     )?;
     if recommended {
-        let current = forecast_mode(state, as_of, selected_id, None, false)?;
+        let current = forecast_plan(state, as_of, selected_id, None, false, false, true)?;
         result.faster_days = current
             .completion_days
             .zip(result.completion_days)
@@ -91,20 +91,48 @@ fn forecast_plan(
     income_required: bool,
     simplify: bool,
 ) -> PouchResult<FinancialForecast> {
-    let selected = state
-        .planned
+    let period_result = period_at(state, as_of);
+    let has_horizon = period_result.is_ok();
+    let period = match period_result {
+        Ok(period) => period,
+        Err(PouchError::MissingPeriod) => crate::models::BudgetPeriod {
+            id: String::new(),
+            recurrence: crate::models::Recurrence::Once,
+            calendar: state.preferences.calendar,
+            start: as_of,
+            end: as_of.add_days(1)?,
+        },
+        Err(error) => return Err(error),
+    };
+    let obligations: Vec<_> = crate::expenses::obligations(state, period.end)?
+        .into_iter()
+        .filter(|item| crate::periods::context::planned_matches(state, item, &period.id))
+        .collect();
+    let selected = obligations
         .iter()
-        .find(|item| item.id == selected_id && item.status == PlannedStatus::Pending)
+        .find(|item| {
+            item.id == selected_id
+                && (item.status == PlannedStatus::Pending
+                    || item.paid_date.is_some_and(|paid| paid > as_of))
+        })
         .ok_or(PouchError::InvalidEntry)?;
-    let period = period_at(state, as_of)?;
     let length = i64::from(period.start.days_until(period.end)).max(1);
     let plan = plan_at(state, as_of);
     let essential = crate::savings::essential(state, as_of)?;
-    let income = match period.income_index {
-        Some(index) if period.funded => state.income[index].amount.hundredths(),
-        _ => 0,
-    };
-    let spent = crate::budget::spent(state, period.start, as_of.add_days(1)?)?;
+    let income = crate::budget::income_for_period(state, &period.id, as_of)?;
+    let linked: std::collections::BTreeSet<(Date, &str)> = obligations
+        .iter()
+        .filter_map(|item| item.paid_date.zip(item.purchase_id.as_deref()))
+        .collect();
+    let spent = state
+        .days
+        .range(period.start..=as_of)
+        .try_fold(0_i64, |sum, (date, day)| {
+            day.purchases
+                .iter()
+                .filter(|item| !linked.contains(&(*date, item.id.as_str())))
+                .try_fold(sum, |sum, item| add(sum, item.amount.hundredths()))
+        })?;
     let elapsed = i64::from(period.start.days_until(as_of).saturating_add(1)).max(1);
     let daily = match daily_allowance {
         Some(amount) => amount.hundredths(),
@@ -113,23 +141,28 @@ fn forecast_plan(
     };
     let living = ceiling(daily, length, 1)?;
     let saved = crate::savings::balance(state, as_of)?;
-    let saved_before = crate::savings::balance_before(state, period.start)?;
-    let current_saved = (saved - saved_before).max(0);
-    let days_left = i64::from(as_of.days_until(period.end)).max(0);
     let summary = crate::budget::recommend(state, as_of)?;
-    let expense_pool = summary
-        .funds
-        .max(0)
-        .min((income - essential - spent - current_saved - ceiling(daily, days_left, 1)?).max(0));
-    let mut items: Vec<_> = state
-        .planned
+    let funding = crate::budget::funding(state, as_of)?;
+    let expense_pool = (funding.cash - saved).max(0).min(funding.reserved);
+    let mut items: Vec<_> = obligations
         .iter()
-        .filter(|item| item.status == PlannedStatus::Pending)
+        .filter(|item| {
+            item.status == PlannedStatus::Pending || item.paid_date.is_some_and(|paid| paid > as_of)
+        })
         .collect();
     items.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
     let mut goal_total = 0;
     let mut expense_total = 0;
-    let mut goal_rate = plan.monthly_savings.hundredths();
+    let contributed = state
+        .allocations
+        .iter()
+        .filter(|item| item.period_id == period.id && item.date <= as_of)
+        .try_fold(0, |sum, item| crate::budget::total(sum, item.amount))?;
+    let mut goal_rate = if simplify {
+        (plan.savings.hundredths() - contributed).max(0)
+    } else {
+        plan.savings.hundredths()
+    };
     let mut expense_rate = 0;
     let mut deadline_possible = true;
     let mut selected_remaining = 0;
@@ -167,8 +200,17 @@ fn forecast_plan(
         }
     }
     let commitments = add(goal_rate, expense_rate)?;
-    let required = add(add(essential, living)?, commitments)?;
-    let required_income = if deadline_possible {
+    let remaining_days = i64::from(as_of.days_until(period.end)).max(1);
+    let required = if simplify {
+        let additional = (add(ceiling(daily, remaining_days, 1)?, commitments)?
+            - funding.free.max(0))
+        .max((-funding.free).max(0))
+        .max(0);
+        add(income, additional)?
+    } else {
+        add(living, commitments)?
+    };
+    let required_income = if deadline_possible && has_horizon {
         Some(required)
     } else {
         None
@@ -183,24 +225,72 @@ fn forecast_plan(
     } else {
         income
     };
-    let available = (projected_income - essential - ceiling(proposed_daily, length, 1)?).max(0);
-    let available_capacity = match selected.kind {
-        PlannedKind::Goal => (available - expense_rate).max(0),
-        PlannedKind::Expense => (available - goal_rate).max(0),
+    let available = if simplify {
+        (crate::budget::total(funding.free, (projected_income - income).max(0))?
+            - ceiling(proposed_daily, remaining_days, 1)?)
+        .max(0)
+    } else {
+        (projected_income - ceiling(proposed_daily, length, 1)?).max(0)
+    };
+    let available_capacity = if simplify {
+        if selected.kind == PlannedKind::Expense {
+            add(
+                available,
+                (projected_income - income)
+                    .max(0)
+                    .min((funding.reserved - expense_pool).max(0)),
+            )?
+        } else {
+            available
+        }
+    } else {
+        match selected.kind {
+            PlannedKind::Goal => (available - expense_rate).max(0),
+            PlannedKind::Expense => (available - goal_rate).max(0),
+        }
     };
     let capacity = if income_required && required_income.is_none() {
         0
-    } else if recommended {
+    } else if simplify || recommended {
         available_capacity
     } else {
         match selected.kind {
-            PlannedKind::Goal => available_capacity.min(plan.monthly_savings.hundredths()),
-            PlannedKind::Expense => (available - plan.monthly_savings.hundredths()).max(0),
+            PlannedKind::Goal => available_capacity.min(plan.savings.hundredths()),
+            PlannedKind::Expense => (available - plan.savings.hundredths()).max(0),
         }
     };
     let completion_days = if selected_cumulative == 0 {
         Some(0)
-    } else if capacity > 0 {
+    } else if simplify && has_horizon && !(income_required && required_income.is_none()) {
+        let current_capacity = available_capacity;
+        if current_capacity >= selected_cumulative {
+            i32::try_from(ceiling(
+                selected_cumulative,
+                remaining_days,
+                current_capacity,
+            )?)
+            .ok()
+        } else {
+            let other = match selected.kind {
+                PlannedKind::Goal => expense_rate,
+                PlannedKind::Expense => goal_rate,
+            };
+            let recurring_capacity = (income - ceiling(proposed_daily, length, 1)? - other).max(0);
+            if recurring_capacity > 0 {
+                i32::try_from(add(
+                    remaining_days,
+                    ceiling(
+                        selected_cumulative - current_capacity,
+                        length,
+                        recurring_capacity,
+                    )?,
+                )?)
+                .ok()
+            } else {
+                None
+            }
+        }
+    } else if capacity > 0 && has_horizon {
         i32::try_from(ceiling(selected_cumulative, length, capacity)?).ok()
     } else {
         None
@@ -208,13 +298,13 @@ fn forecast_plan(
     let completion_date =
         completion_days.and_then(|days| as_of.add_days(days).and_then(Date::iso).ok());
     let completion_days = completion_days.filter(|_| completion_date.is_some());
-    let daily_limit = ((income - essential - commitments).max(0) / length)
+    let daily_limit = ((income - commitments).max(0) / length)
         .min(daily)
         .min(summary.recommendation);
     Ok(FinancialForecast {
         controllable_spending: ceiling(proposed_daily, length, 1)?,
         essential_expenses: essential,
-        configured_savings: plan.monthly_savings.hundredths(),
+        configured_savings: plan.savings.hundredths(),
         extra_days: completion_days.map(|days| {
             if selected_remaining == 0 {
                 return 0;
@@ -222,7 +312,7 @@ fn forecast_plan(
             days.saturating_sub(as_of.days_until(selected.date)).max(0)
         }),
         faster_days: None,
-        monthly_income: income,
+        period_income: income,
         daily_allowance: proposed_daily,
         required_income,
         daily_limit: if simplify {
@@ -230,7 +320,7 @@ fn forecast_plan(
         } else {
             daily_limit
         },
-        monthly_saving: selected_rate,
+        period_saving: selected_rate,
         income_gap: required_income.map(|required| (required - income).max(0)),
         spending_reduction: if simplify {
             daily - proposed_daily
@@ -244,7 +334,11 @@ fn forecast_plan(
         on_track: completion_days
             .is_some_and(|days| days <= as_of.days_until(selected.date).max(0)),
         overdue: selected_remaining > 0 && selected.date <= as_of,
-        cycle_days: i32::try_from(length).map_err(|_| PouchError::InvalidDate)?,
+        cycle_days: if has_horizon {
+            i32::try_from(length).map_err(|_| PouchError::InvalidDate)?
+        } else {
+            0
+        },
         contribution: capacity,
     })
 }
@@ -292,7 +386,7 @@ mod tests {
         assert_eq!(current.allocated, proposed.allocated);
         assert_eq!(current.remaining, proposed.remaining);
         assert_eq!(current.essential_expenses, proposed.essential_expenses);
-        assert_eq!(current.monthly_income, proposed.monthly_income);
+        assert_eq!(current.period_income, proposed.period_income);
         assert!(proposed.daily_allowance <= current.daily_allowance);
         assert!(proposed.contribution >= current.contribution);
         assert_eq!(serde_json::to_string(&state).expect("state"), before);
@@ -309,11 +403,11 @@ mod tests {
             super::preview(&state, state.start_date, "target", false, false).expect("current");
         let required =
             super::preview(&state, state.start_date, "target", true, true).expect("required");
-        assert_eq!(required.monthly_income, 0);
+        assert_eq!(required.period_income, 0);
         assert_eq!(required.allocated, current.allocated);
         assert_eq!(required.daily_allowance, current.daily_allowance);
         assert!(
-            required.required_income.expect("income") > required.monthly_saving.expect("saving")
+            required.required_income.expect("income") > required.period_saving.expect("saving")
         );
         assert!(required.on_track);
         state.planned[0].date = state.start_date;
@@ -331,7 +425,7 @@ mod tests {
             date: state.start_date,
             amount: amount(70_000),
         });
-        state.plans[0].monthly_savings = amount(5_000);
+        state.plans[0].savings = amount(5_000);
         let personal = super::forecast_mode(
             &state,
             state.start_date,
@@ -346,7 +440,7 @@ mod tests {
         assert_eq!(personal.contribution, 5_000);
         assert!(recommended.contribution > personal.contribution);
         assert!(personal.completion_days > recommended.completion_days);
-        state.plans[0].monthly_savings = amount(0);
+        state.plans[0].savings = amount(0);
         let zero = super::forecast_mode(
             &state,
             state.start_date,
@@ -366,7 +460,7 @@ mod tests {
             date: state.start_date,
             amount: amount(70_000),
         });
-        state.plans[0].monthly_savings = amount(100_000);
+        state.plans[0].savings = amount(100_000);
         let result = super::forecast_mode(
             &state,
             state.start_date,
@@ -382,6 +476,20 @@ mod tests {
         let start = Date::parse_iso("2024-01-01").expect("valid date");
         let mut state = AppState::fresh(start);
         state.preferences.calendar = Calendar::Gregorian;
+        crate::periods::create(
+            &mut state,
+            start,
+            start.add_days(31).unwrap(),
+            crate::models::Recurrence::Monthly,
+            Calendar::Gregorian,
+        )
+        .unwrap();
+        let period = crate::periods::at(&state, start).expect("period");
+        state.plans.push(crate::models::BudgetPlan {
+            period_id: period.id,
+            effective: start,
+            savings: amount(0),
+        });
         state.planned.push(PlannedItem {
             id: "target".into(),
             description: "Target".into(),
@@ -392,6 +500,7 @@ mod tests {
             status: PlannedStatus::Pending,
             paid_date: None,
             purchase_id: None,
+            essential_id: None,
         });
         state
     }
@@ -402,7 +511,7 @@ mod tests {
             let state = state(kind);
             let result = forecast(&state, state.start_date, "target", Some(amount(1000)))
                 .expect("valid forecast");
-            assert_eq!(result.monthly_income, 0);
+            assert_eq!(result.period_income, 0);
             assert_eq!(result.allocated, 0);
             assert_eq!(result.required_income, Some(82_667));
             assert_eq!(result.completion_days, None);
@@ -447,6 +556,8 @@ mod tests {
             date: state.start_date,
             amount: amount(70_000),
         });
+        let day = state.start_date;
+        crate::savings::reconcile(&mut state, day).expect("allocate savings");
         let first = forecast(&state, state.start_date, "target", Some(amount(1000)))
             .expect("valid forecast");
         let later = forecast(&state, state.start_date, "later", Some(amount(1000)))
@@ -483,7 +594,7 @@ mod tests {
             .expect("valid forecast");
         assert!(result.overdue);
         assert_eq!(result.required_income, None);
-        assert_eq!(result.monthly_saving, None);
+        assert_eq!(result.period_saving, None);
     }
 
     #[test]
@@ -511,10 +622,10 @@ mod tests {
         later.id = "later".into();
         later.date = Date::parse_iso("2024-05-01").expect("valid date");
         state.planned.push(later);
-        state.plans[0].monthly_savings = amount(400_000);
+        state.plans[0].savings = amount(400_000);
         let result = forecast(&state, state.start_date, "later", Some(amount(1000)))
             .expect("valid forecast");
-        assert_eq!(result.monthly_saving, Some(51_240));
+        assert_eq!(result.period_saving, Some(51_240));
         assert_eq!(result.required_income, Some(431_000));
     }
 
@@ -531,7 +642,7 @@ mod tests {
         let before = serde_json::to_string(&state).expect("serializable state");
         let result = forecast(&state, state.start_date, "target", Some(amount(1000)))
             .expect("valid forecast");
-        assert_eq!(result.monthly_income, 0);
+        assert_eq!(result.period_income, 0);
         assert_eq!(result.completion_date, None);
         assert_eq!(
             serde_json::to_string(&state).expect("serializable state"),
@@ -540,26 +651,29 @@ mod tests {
     }
 
     #[test]
-    fn monthly_requirement_subtracts_registered_savings_and_is_zero_when_funded() {
+    fn period_requirement_subtracts_registered_savings_and_is_zero_when_funded() {
         let mut state = state(PlannedKind::Goal);
         state.income.push(IncomeEntry {
             id: "salary".into(),
             date: state.start_date,
             amount: amount(70_000),
         });
+        let day = state.start_date;
+        crate::savings::reconcile(&mut state, day).expect("allocate savings");
         let result =
             forecast(&state, state.start_date, "target", Some(amount(1000))).expect("forecast");
         assert!(result.allocated > 0);
         assert_eq!(
-            result.monthly_saving,
+            result.period_saving,
             Some(super::ceiling(result.remaining, 31, 60).expect("monthly requirement"))
         );
         state.income[0].amount = amount(200_000);
-        state.plans[0].monthly_savings = amount(100_000);
+        state.plans[0].savings = amount(100_000);
+        crate::savings::reconcile(&mut state, day).expect("allocate savings");
         let funded =
             forecast(&state, state.start_date, "target", Some(amount(1000))).expect("forecast");
         assert_eq!(funded.remaining, 0);
-        assert_eq!(funded.monthly_saving, Some(0));
+        assert_eq!(funded.period_saving, Some(0));
         assert_eq!(funded.completion_days, Some(0));
     }
 }

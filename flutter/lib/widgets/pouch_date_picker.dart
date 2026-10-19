@@ -9,6 +9,7 @@ import '../core/pouch_theme.dart';
 
 // Keep both calendars and the preceding budget cycle within the core's 1900 limit.
 const firstPouchRecordDate = '1900-03-01';
+const lastPouchRecordDate = '3797-12-31';
 
 Future<String?> showPouchDatePicker({
   required BuildContext context,
@@ -21,20 +22,23 @@ Future<String?> showPouchDatePicker({
   required String lastDate,
   Set<String> highlightedDates = const {},
   Set<String>? selectedDates,
-}) => showDialog<String>(
-  context: context,
-  builder: (context) => _PouchDateDialog(
-    bridge: bridge,
-    strings: strings,
-    initialDate: initialDate,
-    calendar: calendar,
-    weekStart: weekStart,
-    firstDate: firstDate,
-    lastDate: lastDate,
-    highlightedDates: highlightedDates,
-    selectedDates: selectedDates,
-  ),
-);
+}) {
+  FocusScope.of(context).unfocus();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => _PouchDateDialog(
+      bridge: bridge,
+      strings: strings,
+      initialDate: initialDate,
+      calendar: calendar,
+      weekStart: weekStart,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      highlightedDates: highlightedDates,
+      selectedDates: selectedDates,
+    ),
+  );
+}
 
 class PouchDateLabel extends StatelessWidget {
   const PouchDateLabel({
@@ -116,8 +120,10 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
     widget.bridge.calendarMonth(_lastDate, widget.calendar, 0),
   ]);
 
+  bool _selecting = false;
+
   String get _lastDate {
-    const jalaliConversionLimit = '3797-12-31';
+    const jalaliConversionLimit = lastPouchRecordDate;
     if (widget.calendar == 'persian' &&
         widget.lastDate.compareTo(jalaliConversionLimit) > 0) {
       return jalaliConversionLimit;
@@ -127,6 +133,7 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
     titlePadding: const EdgeInsets.fromLTRB(16, 15, 16, 8),
     contentPadding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
     title: FutureBuilder<List<PouchCalendarMonth>>(
@@ -134,6 +141,9 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
       builder: (context, bounds) => FutureBuilder<PouchCalendarMonth>(
         future: _month,
         builder: (context, month) {
+          if (bounds.hasError || month.hasError) {
+            return Text(widget.strings.text('invalidDate'));
+          }
           if (!bounds.hasData || !month.hasData) {
             return const LinearProgressIndicator();
           }
@@ -189,8 +199,8 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
               .format(DateTime.utc(2023, 1, weekday + 1));
         });
         return SizedBox(
-          width: 330,
-          height: 306,
+          width: 360,
+          height: 354,
           child: Column(
             children: [
               Row(
@@ -217,6 +227,7 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
                   itemCount: count,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 7,
+                    mainAxisExtent: 48,
                     mainAxisSpacing: 2,
                     crossAxisSpacing: 2,
                   ),
@@ -232,7 +243,9 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
                         iso.compareTo(widget.firstDate) >= 0 &&
                         iso.compareTo(_lastDate) <= 0;
                     return TextButton(
-                      onPressed: enabled ? () => _select(month, day) : null,
+                      onPressed: enabled && !_selecting
+                          ? () => _select(month, day)
+                          : null,
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,
@@ -295,18 +308,28 @@ class _PouchDateDialogState extends State<_PouchDateDialog> {
   }
 
   Future<void> _select(PouchCalendarMonth month, int day) async {
-    final date = await widget.bridge.calendarDate(
-      year: month.year,
-      month: month.month,
-      day: day,
-      calendar: widget.calendar,
-    );
-    if (mounted) Navigator.pop(context, date);
+    if (_selecting) return;
+    setState(() => _selecting = true);
+    try {
+      final date = await widget.bridge.calendarDate(
+        year: month.year,
+        month: month.month,
+        day: day,
+        calendar: widget.calendar,
+      );
+      if (mounted) Navigator.pop(context, date);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _selecting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.strings.text('invalidDate'))),
+      );
+    }
   }
 
   String _monthTitle(PouchCalendarMonth month) {
     if (widget.calendar == 'gregory') {
-      return DateFormat.MMMM(widget.strings.language)
+      return DateFormat.yMMMM(widget.strings.language)
           .format(DateTime.utc(month.year, month.month));
     }
     const english = [

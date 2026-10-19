@@ -2,9 +2,7 @@ use std::path::Path;
 
 use chrono::Local;
 
-use crate::{
-    AppState, Date, PouchError, PouchResult, backup, models::Preferences, storage::BinaryStore,
-};
+use crate::{AppState, Date, PouchError, PouchResult, models::Preferences, storage::BinaryStore};
 
 pub struct CoreModules {
     state: AppState,
@@ -23,32 +21,20 @@ impl CoreModules {
         let mut storage = BinaryStore::new(directory);
         let loaded = storage.load()?;
         let (state, recovered, imported_json) = match loaded {
-            Some(loaded) => (loaded.state, loaded.recovered, false),
+            Some(loaded) => {
+                if loaded.upgraded {
+                    storage.save(&loaded.state)?;
+                }
+                (loaded.state, loaded.recovered, false)
+            }
             None => {
-                let mut imported = None;
-                let mut last_import_error = None;
-                for contents in legacy_json_candidates {
-                    match backup::import_json(contents) {
-                        Ok(state) => {
-                            imported = Some(state);
-                            break;
-                        }
-                        Err(error) => last_import_error = Some(error),
-                    }
+                if !legacy_json_candidates.is_empty() {
+                    return Err(PouchError::UnsupportedStorageVersion);
                 }
-                if let Some(imported) = imported {
-                    imported.validate()?;
-                    storage.save(&imported)?;
-                    (imported, false, true)
-                } else if let Some(error) = last_import_error {
-                    return Err(error);
-                } else {
-                    let today = Local::now().date_naive();
-                    let start_date = Date::from_naive_date(today)?;
-                    let initial = AppState::fresh(start_date);
-                    storage.save(&initial)?;
-                    (initial, false, false)
-                }
+                let start_date = Date::from_naive_date(Local::now().date_naive())?;
+                let initial = AppState::fresh(start_date);
+                storage.save(&initial)?;
+                (initial, false, false)
             }
         };
 
@@ -100,6 +86,10 @@ impl CoreModules {
     ) -> PouchResult<u64> {
         let mut next = self.state.clone();
         update(&mut next)?;
+        crate::periods::context::synchronize(&mut next);
+        next.validate()?;
+        let today = Date::from_naive_date(Local::now().date_naive())?;
+        crate::savings::reconcile(&mut next, today)?;
         self.commit(next)
     }
 
@@ -110,6 +100,10 @@ impl CoreModules {
         let previous = self.state.clone();
         let mut next = previous.clone();
         update(&mut next)?;
+        crate::periods::context::synchronize(&mut next);
+        next.validate()?;
+        let today = Date::from_naive_date(Local::now().date_naive())?;
+        crate::savings::reconcile(&mut next, today)?;
         let revision = self.commit(next)?;
         self.undo_state = Some(previous);
         Ok(revision)
@@ -133,8 +127,9 @@ impl CoreModules {
         Ok(true)
     }
 
-    fn commit(&mut self, next: AppState) -> PouchResult<u64> {
+    fn commit(&mut self, mut next: AppState) -> PouchResult<u64> {
         next.validate()?;
+        crate::periods::context::synchronize(&mut next);
         let revision = self
             .revision
             .checked_add(1)
@@ -164,6 +159,17 @@ mod tests {
         let spent = today.add_days(-3).expect("the purchase date is valid");
         let mut core = CoreModules::open(directory.path(), &[]).expect("the core opens");
 
+        core.apply(|state| {
+            crate::periods::create(
+                state,
+                received,
+                today.add_days(31)?,
+                crate::models::Recurrence::Monthly,
+                crate::models::Calendar::Gregorian,
+            )
+            .map(|_| ())
+        })
+        .expect("period");
         crate::budget::recommend(core.state(), received)
             .expect("an earlier day can be viewed before saving a record");
         core.apply(|state| {
@@ -188,9 +194,8 @@ mod tests {
         })
         .expect("a backdated purchase is saved");
         let after = crate::budget::recommend(core.state(), today).expect("today is recalculated");
-        assert_eq!(after.carry, before.carry - 200);
+        assert_eq!(after.remaining, before.remaining - 200);
         assert_eq!(core.state().start_date, received);
-        assert_eq!(core.state().plans[0].effective, received);
 
         let reopened = CoreModules::open(directory.path(), &[]).expect("saved history reopens");
         assert_eq!(reopened.state().income[0].date, received);
@@ -215,7 +220,6 @@ mod tests {
         assert_eq!(core.state().start_date, earlier);
         assert!(core.undo().expect("the history extension can be undone"));
         assert_eq!(core.state().start_date, received);
-        assert_eq!(core.state().plans[0].effective, received);
     }
 
     #[test]

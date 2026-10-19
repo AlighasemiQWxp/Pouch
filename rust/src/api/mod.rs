@@ -91,8 +91,19 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
-    pub fn budget_summary(&self, date: String) -> Result<BudgetSnapshot, String> {
-        let date = parse_date(&date)?;
+    pub fn budget_summary(
+        &self,
+        date: String,
+        period_id: Option<String>,
+    ) -> Result<BudgetSnapshot, String> {
+        let mut date = parse_date(&date)?;
+        if let Some(id) = period_id {
+            let period =
+                crate::periods::find(self.core.state(), &id).map_err(|error| error.to_string())?;
+            date = date
+                .max(period.start)
+                .min(period.end.add_days(-1).map_err(|error| error.to_string())?);
+        }
         let summary =
             crate::budget::recommend(self.core.state(), date).map_err(|error| error.to_string())?;
         Ok(BudgetSnapshot {
@@ -111,6 +122,7 @@ impl PouchApp {
             savings: summary.savings,
             funds: summary.funds,
             reserved: summary.reserved,
+            funded_expenses: summary.funded_expenses,
             recommendation: summary.recommendation,
             shortfall: summary.shortfall,
         })
@@ -158,43 +170,23 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
-    pub fn set_daily_override(
-        &mut self,
-        date: String,
-        amount: Option<String>,
-    ) -> Result<AppSnapshot, String> {
-        let date = parse_date(&date)?;
-        let amount = amount.map(|value| parse_amount(&value)).transpose()?;
-        self.core
-            .apply(|state| crate::purchases::set_daily_override(state, date, amount))
-            .map_err(|error| error.to_string())?;
-        snapshot(&self.core)
-    }
-
-    pub fn record_income(
-        &mut self,
-        id: String,
-        date: String,
-        amount: String,
-    ) -> Result<AppSnapshot, String> {
-        let date = parse_date(&date)?;
-        let amount = parse_amount(&amount)?;
-        self.core
-            .apply(|state| crate::income::record(state, id, date, amount))
-            .map_err(|error| error.to_string())?;
-        snapshot(&self.core)
-    }
-
     pub fn update_income(
         &mut self,
         id: String,
         date: String,
         amount: String,
+        period_id: Option<String>,
     ) -> Result<AppSnapshot, String> {
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
         self.core
-            .apply(|state| crate::income::edit(state, &id, date, amount))
+            .apply(|state| {
+                crate::income::edit(state, &id, date, amount)?;
+                if let Some(period_id) = period_id {
+                    crate::periods::context::assign_income(state, &id, &period_id)?;
+                }
+                Ok(())
+            })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
     }
@@ -204,11 +196,18 @@ impl PouchApp {
         id: String,
         date: String,
         amount: String,
+        period_id: Option<String>,
     ) -> Result<AppSnapshot, String> {
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
         self.core
-            .apply(|state| crate::income::schedule(state, id, date, amount))
+            .apply(|state| {
+                crate::income::schedule(state, id.clone(), date, amount)?;
+                if let Some(period_id) = period_id {
+                    crate::periods::context::assign_income(state, &id, &period_id)?;
+                }
+                Ok(())
+            })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
     }
@@ -218,24 +217,17 @@ impl PouchApp {
         id: String,
         date: String,
         amount: String,
+        period_id: Option<String>,
     ) -> Result<AppSnapshot, String> {
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
         self.core
-            .apply(|state| crate::income::edit_expected(state, &id, date, amount))
-            .map_err(|error| error.to_string())?;
-        snapshot(&self.core)
-    }
-
-    pub fn mark_expected_income_received(
-        &mut self,
-        id: String,
-        received_date: String,
-    ) -> Result<AppSnapshot, String> {
-        let received_date = parse_date(&received_date)?;
-        self.core
-            .apply_reversible(|state| {
-                crate::income::mark_expected_received(state, &id, received_date)
+            .apply(|state| {
+                crate::income::edit_expected(state, &id, date, amount)?;
+                if let Some(period_id) = period_id {
+                    crate::periods::context::assign_income(state, &id, &period_id)?;
+                }
+                Ok(())
             })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
@@ -263,41 +255,16 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn save_budget_plan(
         &mut self,
+        period_id: String,
         effective: String,
-        salary: Option<String>,
-        daily_budget: String,
-        expense_ids: Vec<String>,
-        expense_names: Vec<String>,
-        expense_amounts: Vec<String>,
         savings: String,
-        payday: u8,
     ) -> Result<AppSnapshot, String> {
-        if expense_ids.len() != expense_names.len() || expense_ids.len() != expense_amounts.len() {
-            return Err("The required expense entries are incomplete.".into());
-        }
         let plan = BudgetPlan {
+            period_id,
             effective: parse_date(&effective)?,
-            fallback_salary: salary.map(|value| parse_amount(&value)).transpose()?,
-            daily_budget: parse_amount(&daily_budget)?,
-            expenses: expense_ids
-                .into_iter()
-                .zip(expense_names)
-                .zip(expense_amounts)
-                .map(|((id, name), amount)| {
-                    Ok(RequiredExpense {
-                        id,
-                        name,
-                        amount: parse_amount(&amount)?,
-                    })
-                })
-                .collect::<Result<Vec<_>, String>>()?,
-            monthly_savings: parse_amount(&savings)?,
-            payday,
-            calendar: self.core.state().preferences.calendar,
-            legacy: false,
+            savings: parse_amount(&savings)?,
         };
         self.core
             .apply(|state| crate::budget::save_plan(state, plan))
@@ -305,6 +272,219 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
+    pub fn period_view(&self, date: String) -> Result<PeriodViewSnapshot, String> {
+        let date = parse_date(&date)?;
+        let state = self.core.state();
+        let period = crate::periods::at(state, date).map_err(|error| error.to_string())?;
+        let today = Date::from_naive_date(chrono::Local::now().date_naive())
+            .map_err(|error| error.to_string())?;
+        let as_of = today
+            .min(period.end.add_days(-1).map_err(|error| error.to_string())?)
+            .max(period.start);
+        let income = state
+            .income
+            .iter()
+            .filter(|item| {
+                crate::periods::context::income_period(state, &item.id, item.date)
+                    == Some(period.id.as_str())
+            })
+            .map(|item| {
+                Ok(IncomeSnapshot {
+                    id: item.id.clone(),
+                    date: item.date.iso().map_err(|error| error.to_string())?,
+                    amount: item.amount.hundredths(),
+                    period_id: crate::periods::context::income_period(state, &item.id, item.date)
+                        .map(str::to_owned),
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let expected_income = state
+            .expected_income
+            .iter()
+            .filter(|item| {
+                crate::periods::context::income_period(state, &item.id, item.date)
+                    == Some(period.id.as_str())
+            })
+            .map(|item| {
+                Ok(ExpectedIncomeSnapshot {
+                    id: item.id.clone(),
+                    date: item.date.iso().map_err(|error| error.to_string())?,
+                    amount: item.amount.hundredths(),
+                    period_id: crate::periods::context::income_period(state, &item.id, item.date)
+                        .map(str::to_owned),
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let expected_total = expected_income
+            .iter()
+            .try_fold(0, |sum, item| crate::budget::total(sum, item.amount))
+            .map_err(|error| error.to_string())?;
+        let obligations = crate::expenses::obligations(state, period.end)
+            .map_err(|error| error.to_string())?
+            .iter()
+            .filter(|item| {
+                item.kind == PlannedKind::Expense
+                    && crate::periods::context::planned_matches(state, item, &period.id)
+                    && (item.date < period.end
+                        || crate::periods::context::planned_period(state, item).is_some())
+                    && (item.date >= period.start
+                        || item.status == PlannedStatus::Pending
+                        || item.paid_date.is_some_and(|paid| paid > as_of))
+            })
+            .map(|item| planned_snapshot_at(state, item, as_of))
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(PeriodViewSnapshot {
+            period: period_snapshot(state, &period)?,
+            plan: plan_snapshot(&crate::budget::plan_at(state, as_of))?,
+            budget: self.budget_summary(
+                as_of.iso().map_err(|error| error.to_string())?,
+                Some(period.id.clone()),
+            )?,
+            income,
+            expected_income,
+            expected_total,
+            targets: crate::expenses::obligations(state, period.end)
+                .map_err(|error| error.to_string())?
+                .iter()
+                .filter(|item| {
+                    crate::periods::context::planned_matches(state, item, &period.id)
+                        && (item.status == PlannedStatus::Pending
+                            || item.paid_date.is_some_and(|paid| paid > as_of))
+                })
+                .map(|item| planned_snapshot_at(state, item, as_of))
+                .collect::<Result<Vec<_>, _>>()?,
+            obligations,
+        })
+    }
+
+    pub fn save_period(
+        &mut self,
+        id: Option<String>,
+        start: String,
+        kind: String,
+        custom_days: u16,
+        through: Option<String>,
+    ) -> Result<AppSnapshot, String> {
+        let start = parse_date(&start)?;
+        let recurrence = parse_recurrence(&kind, custom_days)?;
+        let calendar = id
+            .as_deref()
+            .and_then(|id| {
+                self.core
+                    .state()
+                    .periods
+                    .iter()
+                    .find(|period| period.id == id)
+            })
+            .map(|period| period.calendar)
+            .unwrap_or(self.core.state().preferences.calendar);
+        let through = through.map(|date| parse_date(&date)).transpose()?;
+        let end = crate::periods::horizon(start, recurrence, calendar, through)
+            .map_err(|error| error.to_string())?;
+        self.core
+            .apply(|state| match id {
+                Some(id) => crate::periods::edit(state, &id, start, end, recurrence, calendar),
+                None => crate::periods::create(state, start, end, recurrence, calendar).map(|_| ()),
+            })
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn remove_period(&mut self, id: String) -> Result<AppSnapshot, String> {
+        self.core
+            .apply_reversible(|state| crate::periods::remove(state, &id))
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn receive_income(&mut self, receipt: ReceiveIncomeRequest) -> Result<AppSnapshot, String> {
+        let ReceiveIncomeRequest {
+            id,
+            date,
+            amount,
+            period_id,
+            start_new,
+            kind,
+            custom_days,
+            through,
+            expected,
+        } = receipt;
+        let date = parse_date(&date)?;
+        let amount = parse_amount(&amount)?;
+        let calendar = self.core.state().preferences.calendar;
+        let recurrence = parse_recurrence(&kind, custom_days)?;
+        let new_period = if start_new {
+            let through = through.map(|date| parse_date(&date)).transpose()?;
+            Some((
+                crate::periods::horizon(date, recurrence, calendar, through)
+                    .map_err(|error| error.to_string())?,
+                recurrence,
+                calendar,
+            ))
+        } else {
+            None
+        };
+        self.core
+            .apply(|state| {
+                crate::income::receive(
+                    state,
+                    id,
+                    date,
+                    amount,
+                    period_id.as_deref(),
+                    new_period,
+                    expected,
+                )
+            })
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn save_essential_expense(
+        &mut self,
+        id: String,
+        name: String,
+        amount: String,
+        date: String,
+        kind: String,
+        custom_days: u16,
+    ) -> Result<AppSnapshot, String> {
+        let calendar = self
+            .core
+            .state()
+            .essentials
+            .iter()
+            .find(|item| item.id == id)
+            .map(|item| item.calendar)
+            .unwrap_or(self.core.state().preferences.calendar);
+        let expense = RequiredExpense {
+            id,
+            name,
+            amount: parse_amount(&amount)?,
+            date: parse_date(&date)?,
+            recurrence: parse_recurrence(&kind, custom_days)?,
+            calendar,
+            until: None,
+        };
+        self.core
+            .apply(|state| crate::expenses::save_essential(state, expense))
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    pub fn stop_essential_expense(
+        &mut self,
+        id: String,
+        date: String,
+    ) -> Result<AppSnapshot, String> {
+        let date = parse_date(&date)?;
+        self.core
+            .apply_reversible(|state| crate::expenses::stop_essential(state, &id, date))
+            .map_err(|error| error.to_string())?;
+        snapshot(&self.core)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn save_planned(
         &mut self,
         id: String,
@@ -313,6 +493,7 @@ impl PouchApp {
         category: String,
         kind: String,
         date: String,
+        period_id: Option<String>,
     ) -> Result<AppSnapshot, String> {
         let item = crate::expenses::create_planned(
             id,
@@ -322,8 +503,15 @@ impl PouchApp {
             parse_planned_kind(&kind)?,
             parse_date(&date)?,
         );
+        let item_id = item.id.clone();
         self.core
-            .apply(|state| crate::expenses::save_planned(state, item))
+            .apply(|state| {
+                crate::expenses::save_planned(state, item)?;
+                if let Some(period_id) = period_id {
+                    crate::periods::context::assign_planned(state, &item_id, &period_id)?;
+                }
+                Ok(())
+            })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
     }
@@ -488,10 +676,19 @@ impl PouchApp {
         selected_id: String,
         recommended: bool,
         income_required: bool,
+        period_id: Option<String>,
     ) -> Result<FinancialForecastSnapshot, String> {
+        let mut date = parse_date(&as_of)?;
+        if let Some(id) = period_id {
+            let period =
+                crate::periods::find(self.core.state(), &id).map_err(|error| error.to_string())?;
+            date = date
+                .max(period.start)
+                .min(period.end.add_days(-1).map_err(|error| error.to_string())?);
+        }
         let forecast = crate::forecast::preview(
             self.core.state(),
-            parse_date(&as_of)?,
+            date,
             &selected_id,
             recommended,
             income_required,
@@ -503,11 +700,11 @@ impl PouchApp {
             configured_savings: forecast.configured_savings,
             extra_days: forecast.extra_days,
             faster_days: forecast.faster_days,
-            monthly_income: forecast.monthly_income,
+            period_income: forecast.period_income,
             daily_allowance: forecast.daily_allowance,
             required_income: forecast.required_income,
             daily_limit: forecast.daily_limit,
-            monthly_saving: forecast.monthly_saving,
+            period_saving: forecast.period_saving,
             income_gap: forecast.income_gap,
             spending_reduction: forecast.spending_reduction,
             allocated: forecast.allocated,
@@ -529,7 +726,7 @@ impl PouchApp {
                 Ok(GoalForecastSnapshot {
                     id: goal.id,
                     periods: goal.periods,
-                    required_monthly: goal.required_monthly,
+                    required_per_period: goal.required_per_period,
                     projected: goal.projected,
                     percent: goal.percent,
                     difference: goal.difference,
@@ -638,6 +835,11 @@ pub struct AppSnapshot {
     pub income: Vec<IncomeSnapshot>,
     pub expected_income: Vec<ExpectedIncomeSnapshot>,
     pub plans: Vec<BudgetPlanSnapshot>,
+    pub current_plan: BudgetPlanSnapshot,
+    pub current_period: Option<PeriodSnapshot>,
+    pub periods: Vec<PeriodSnapshot>,
+    pub essentials: Vec<RequiredExpenseSnapshot>,
+    pub income_days: Vec<IncomeDaySnapshot>,
     pub days: Vec<DaySnapshot>,
     pub planned: Vec<PlannedSnapshot>,
 }
@@ -651,12 +853,14 @@ pub struct PreferencesSnapshot {
 }
 
 pub struct IncomeSnapshot {
+    pub period_id: Option<String>,
     pub id: String,
     pub date: String,
     pub amount: i64,
 }
 
 pub struct ExpectedIncomeSnapshot {
+    pub period_id: Option<String>,
     pub id: String,
     pub date: String,
     pub amount: i64,
@@ -666,17 +870,69 @@ pub struct RequiredExpenseSnapshot {
     pub id: String,
     pub name: String,
     pub amount: i64,
+    pub date: String,
+    pub recurrence: String,
+    pub custom_days: u16,
+    pub until: Option<String>,
 }
 
 pub struct BudgetPlanSnapshot {
+    pub period_id: String,
     pub effective: String,
-    pub salary: Option<i64>,
-    pub daily_budget: i64,
-    pub expenses: Vec<RequiredExpenseSnapshot>,
     pub savings: i64,
-    pub payday: u8,
+}
+
+pub struct PeriodSnapshot {
+    pub name: String,
+    pub id: String,
+    pub start: String,
+    pub end: String,
+    pub previous_date: String,
+    pub change_from: String,
+    pub status: String,
+    pub income: i64,
+    pub expenses: i64,
+    pub savings: i64,
+    pub planned_savings: i64,
+    pub contributed_savings: i64,
+    pub remaining: i64,
+    pub carry: i64,
+    pub reserved: i64,
+    pub funded_expenses: i64,
+    pub next_date: String,
+    pub recurrence: String,
+    pub custom_days: u16,
     pub calendar: String,
-    pub legacy: bool,
+}
+
+pub struct ReceiveIncomeRequest {
+    pub id: String,
+    pub date: String,
+    pub amount: String,
+    pub period_id: Option<String>,
+    pub start_new: bool,
+    pub kind: String,
+    pub custom_days: u16,
+    pub through: Option<String>,
+    pub expected: bool,
+}
+
+pub struct PeriodViewSnapshot {
+    pub period: PeriodSnapshot,
+    pub plan: BudgetPlanSnapshot,
+    pub budget: BudgetSnapshot,
+    pub income: Vec<IncomeSnapshot>,
+    pub expected_income: Vec<ExpectedIncomeSnapshot>,
+    pub expected_total: i64,
+    pub targets: Vec<PlannedSnapshot>,
+    pub obligations: Vec<PlannedSnapshot>,
+}
+
+pub struct IncomeDaySnapshot {
+    pub date: String,
+    pub received: i64,
+    pub expected: i64,
+    pub count: i32,
 }
 
 pub struct PurchaseSnapshot {
@@ -689,11 +945,11 @@ pub struct PurchaseSnapshot {
 
 pub struct DaySnapshot {
     pub date: String,
-    pub budget: Option<i64>,
     pub purchases: Vec<PurchaseSnapshot>,
 }
 
 pub struct PlannedSnapshot {
+    pub period_id: Option<String>,
     pub id: String,
     pub description: String,
     pub amount: i64,
@@ -703,6 +959,7 @@ pub struct PlannedSnapshot {
     pub status: String,
     pub paid_date: Option<String>,
     pub purchase_id: Option<String>,
+    pub essential_id: Option<String>,
 }
 
 pub struct BudgetSnapshot {
@@ -718,6 +975,7 @@ pub struct BudgetSnapshot {
     pub savings: i64,
     pub funds: i64,
     pub reserved: i64,
+    pub funded_expenses: i64,
     pub recommendation: i64,
     pub shortfall: i64,
 }
@@ -729,11 +987,11 @@ pub struct FinancialForecastSnapshot {
     pub extra_days: Option<i32>,
     pub faster_days: Option<i32>,
     pub contribution: i64,
-    pub monthly_income: i64,
+    pub period_income: i64,
     pub daily_allowance: i64,
     pub required_income: Option<i64>,
     pub daily_limit: i64,
-    pub monthly_saving: Option<i64>,
+    pub period_saving: Option<i64>,
     pub income_gap: Option<i64>,
     pub spending_reduction: i64,
     pub allocated: i64,
@@ -748,7 +1006,7 @@ pub struct FinancialForecastSnapshot {
 pub struct GoalForecastSnapshot {
     pub id: String,
     pub periods: i32,
-    pub required_monthly: Option<i64>,
+    pub required_per_period: Option<i64>,
     pub projected: i64,
     pub percent: i32,
     pub difference: Option<i64>,
@@ -892,6 +1150,8 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
                 id: entry.id.clone(),
                 date: entry.date.iso().map_err(|error| error.to_string())?,
                 amount: entry.amount.hundredths(),
+                period_id: crate::periods::context::income_period(state, &entry.id, entry.date)
+                    .map(str::to_owned),
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -903,30 +1163,64 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
                 id: entry.id.clone(),
                 date: entry.date.iso().map_err(|error| error.to_string())?,
                 amount: entry.amount.hundredths(),
+                period_id: crate::periods::context::income_period(state, &entry.id, entry.date)
+                    .map(str::to_owned),
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
+    let today = Date::from_naive_date(chrono::Local::now().date_naive())
+        .map_err(|error| error.to_string())?;
+    let current_period = match crate::periods::at(state, today) {
+        Ok(period) => Some(period_snapshot(state, &period)?),
+        Err(crate::PouchError::MissingPeriod) => None,
+        Err(error) => return Err(error.to_string()),
+    };
+    let current_plan = plan_snapshot(&crate::budget::plan_at(state, today))?;
     let plans = state
         .plans
         .iter()
-        .map(|plan| {
-            Ok(BudgetPlanSnapshot {
-                effective: plan.effective.iso().map_err(|error| error.to_string())?,
-                salary: plan.fallback_salary.map(|amount| amount.hundredths()),
-                daily_budget: plan.daily_budget.hundredths(),
-                expenses: plan
-                    .expenses
-                    .iter()
-                    .map(|expense| RequiredExpenseSnapshot {
-                        id: expense.id.clone(),
-                        name: expense.name.clone(),
-                        amount: expense.amount.hundredths(),
-                    })
-                    .collect(),
-                savings: plan.monthly_savings.hundredths(),
-                payday: plan.payday,
-                calendar: calendar_name(plan.calendar).to_owned(),
-                legacy: plan.legacy,
+        .map(plan_snapshot)
+        .collect::<Result<Vec<_>, _>>()?;
+    let essentials = state
+        .essentials
+        .iter()
+        .map(|expense| {
+            Ok(RequiredExpenseSnapshot {
+                id: expense.id.clone(),
+                name: expense.name.clone(),
+                amount: expense.amount.hundredths(),
+                date: expense.date.iso().map_err(|error| error.to_string())?,
+                recurrence: recurrence_name(expense.recurrence).into(),
+                custom_days: recurrence_days(expense.recurrence),
+                until: expense
+                    .until
+                    .map(Date::iso)
+                    .transpose()
+                    .map_err(|error| error.to_string())?,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let mut day_totals = std::collections::BTreeMap::<Date, (i64, i64, i32)>::new();
+    for item in &state.income {
+        let values = day_totals.entry(item.date).or_default();
+        values.0 = crate::budget::total(values.0, item.amount.hundredths())
+            .map_err(|error| error.to_string())?;
+        values.2 += 1;
+    }
+    for item in &state.expected_income {
+        let values = day_totals.entry(item.date).or_default();
+        values.1 = crate::budget::total(values.1, item.amount.hundredths())
+            .map_err(|error| error.to_string())?;
+        values.2 += 1;
+    }
+    let income_days = day_totals
+        .into_iter()
+        .map(|(date, (received, expected, count))| {
+            Ok(IncomeDaySnapshot {
+                date: date.iso().map_err(|error| error.to_string())?,
+                received,
+                expected,
+                count,
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -936,7 +1230,6 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
         .map(|(date, day)| {
             Ok(DaySnapshot {
                 date: date.iso().map_err(|error| error.to_string())?,
-                budget: day.budget_override.map(|amount| amount.hundredths()),
                 purchases: day
                     .purchases
                     .iter()
@@ -951,26 +1244,14 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
-    let planned = state
-        .planned
+    let horizon = crate::periods::at(state, today)
+        .map(|period| period.end)
+        .unwrap_or(today);
+    let obligations =
+        crate::expenses::obligations(state, horizon).map_err(|error| error.to_string())?;
+    let planned = obligations
         .iter()
-        .map(|item| {
-            Ok(PlannedSnapshot {
-                id: item.id.clone(),
-                description: item.description.clone(),
-                amount: item.amount.hundredths(),
-                category: category_name(item.category).to_owned(),
-                kind: planned_kind_name(item.kind).to_owned(),
-                date: item.date.iso().map_err(|error| error.to_string())?,
-                status: planned_status_name(item.status).to_owned(),
-                paid_date: item
-                    .paid_date
-                    .map(|date| date.iso())
-                    .transpose()
-                    .map_err(|error| error.to_string())?,
-                purchase_id: item.purchase_id.clone(),
-            })
-        })
+        .map(|item| planned_snapshot(state, item))
         .collect::<Result<Vec<_>, String>>()?;
     Ok(AppSnapshot {
         revision: core.revision(),
@@ -981,9 +1262,198 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
         income,
         expected_income,
         plans,
+        current_plan,
+        current_period,
+        periods: state
+            .periods
+            .iter()
+            .map(|period| period_snapshot(state, period))
+            .collect::<Result<Vec<_>, _>>()?,
+        essentials,
+        income_days,
         days,
         planned,
     })
+}
+
+fn planned_snapshot(state: &AppState, item: &PlannedItem) -> Result<PlannedSnapshot, String> {
+    Ok(PlannedSnapshot {
+        id: item.id.clone(),
+        description: item.description.clone(),
+        amount: item.amount.hundredths(),
+        category: category_name(item.category).into(),
+        kind: planned_kind_name(item.kind).into(),
+        date: item.date.iso().map_err(|error| error.to_string())?,
+        status: planned_status_name(item.status).into(),
+        paid_date: item
+            .paid_date
+            .map(Date::iso)
+            .transpose()
+            .map_err(|error| error.to_string())?,
+        purchase_id: item.purchase_id.clone(),
+        essential_id: item.essential_id.clone(),
+        period_id: crate::periods::context::planned_period(state, item).map(str::to_owned),
+    })
+}
+
+fn planned_snapshot_at(
+    state: &AppState,
+    item: &PlannedItem,
+    as_of: Date,
+) -> Result<PlannedSnapshot, String> {
+    let mut value = planned_snapshot(state, item)?;
+    if item.paid_date.is_some_and(|date| date > as_of) {
+        value.status = "pending".into();
+        value.paid_date = None;
+        value.purchase_id = None;
+    }
+    Ok(value)
+}
+
+fn plan_snapshot(plan: &BudgetPlan) -> Result<BudgetPlanSnapshot, String> {
+    Ok(BudgetPlanSnapshot {
+        period_id: plan.period_id.clone(),
+        effective: plan.effective.iso().map_err(|error| error.to_string())?,
+        savings: plan.savings.hundredths(),
+    })
+}
+
+fn period_snapshot(
+    state: &crate::AppState,
+    period: &BudgetPeriod,
+) -> Result<PeriodSnapshot, String> {
+    let today = Date::from_naive_date(chrono::Local::now().date_naive())
+        .map_err(|error| error.to_string())?;
+    let as_of = today
+        .max(period.start)
+        .min(period.end.add_days(-1).map_err(|error| error.to_string())?);
+    let summary = crate::budget::recommend(state, as_of).map_err(|error| error.to_string())?;
+    let status = if today < period.start {
+        "upcoming"
+    } else if today >= period.end {
+        if state
+            .periods
+            .last()
+            .is_some_and(|last| last.id == period.id)
+        {
+            "expired"
+        } else {
+            "closed"
+        }
+    } else {
+        "active"
+    };
+    Ok(PeriodSnapshot {
+        name: state
+            .period_context
+            .names
+            .get(&period.id)
+            .unwrap_or(&period.id)
+            .clone(),
+        change_from: period.start.iso().map_err(|error| error.to_string())?,
+        status: status.into(),
+        income: summary.income,
+        expenses: crate::budget::spent(
+            state,
+            period.start,
+            as_of.add_days(1).map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| error.to_string())?,
+        savings: summary.savings,
+        planned_savings: crate::budget::plan_at(state, as_of).savings.hundredths(),
+        contributed_savings: state
+            .allocations
+            .iter()
+            .filter(|item| item.period_id == period.id && item.date <= as_of)
+            .try_fold(0, |sum, item| crate::budget::total(sum, item.amount))
+            .map_err(|error| error.to_string())?,
+        remaining: summary.remaining,
+        carry: summary.carry,
+        reserved: summary.reserved,
+        funded_expenses: summary.funded_expenses,
+        id: period.id.clone(),
+        start: period.start.iso().map_err(|error| error.to_string())?,
+        end: period
+            .end
+            .add_days(-1)
+            .and_then(Date::iso)
+            .map_err(|error| error.to_string())?,
+        previous_date: period
+            .start
+            .add_days(-1)
+            .and_then(Date::iso)
+            .unwrap_or(period.start.iso().map_err(|error| error.to_string())?),
+        next_date: period.end.iso().map_err(|error| error.to_string())?,
+        recurrence: recurrence_name(period.recurrence).into(),
+        custom_days: recurrence_days(period.recurrence),
+        calendar: calendar_name(period.calendar).into(),
+    })
+}
+
+fn parse_recurrence(kind: &str, days: u16) -> Result<Recurrence, String> {
+    let recurrence = match kind {
+        "once" => Recurrence::Once,
+        "weekly" => Recurrence::Weekly,
+        "biweekly" => Recurrence::Biweekly,
+        "monthly" => Recurrence::Monthly,
+        "custom" => Recurrence::Custom(days),
+        _ => return Err("Choose a valid schedule.".into()),
+    };
+    crate::periods::validate_recurrence(recurrence).map_err(|error| error.to_string())?;
+    Ok(recurrence)
+}
+
+fn recurrence_name(value: Recurrence) -> &'static str {
+    match value {
+        Recurrence::Once => "once",
+        Recurrence::Weekly => "weekly",
+        Recurrence::Biweekly => "biweekly",
+        Recurrence::Monthly => "monthly",
+        Recurrence::Custom(_) => "custom",
+    }
+}
+
+fn recurrence_days(value: Recurrence) -> u16 {
+    match value {
+        Recurrence::Custom(days) => days,
+        _ => 0,
+    }
+}
+
+pub fn reset_incompatible_storage(application_data_directory: String) -> Result<(), String> {
+    let directory = std::path::PathBuf::from(application_data_directory);
+    let mut store = crate::storage::BinaryStore::new(&directory);
+    match store.load() {
+        Err(crate::PouchError::UnsupportedStorageVersion) | Ok(None) => {}
+        Err(error) => return Err(error.to_string()),
+        Ok(Some(_)) => {
+            return Err("Compatible data are already present. Use Reset in Settings.".into());
+        }
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let archive = directory.join(format!("incompatible-{stamp}"));
+    std::fs::create_dir(&archive).map_err(|error| error.to_string())?;
+    let mut moved = Vec::new();
+    for name in ["pouch.data", "pouch.data.backup"] {
+        let source = directory.join(name);
+        if source.exists() {
+            if let Err(error) = std::fs::rename(&source, archive.join(name)) {
+                for previous in &moved {
+                    let _ = std::fs::rename(archive.join(previous), directory.join(previous));
+                }
+                return Err(error.to_string());
+            }
+            moved.push(name);
+        }
+    }
+    let today = Date::from_naive_date(chrono::Local::now().date_naive())
+        .map_err(|error| error.to_string())?;
+    crate::storage::BinaryStore::new(&directory)
+        .save(&crate::AppState::fresh(today))
+        .map_err(|error| error.to_string())
 }
 
 fn parse_currency(value: &str) -> Result<Currency, String> {

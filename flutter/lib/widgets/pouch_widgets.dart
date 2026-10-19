@@ -14,10 +14,15 @@ class PouchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
     controller: controller,
-    padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+    padding: EdgeInsets.fromLTRB(
+      MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+      8,
+      MediaQuery.sizeOf(context).width < 600 ? 16 : 32,
+      32,
+    ),
     child: Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
+        constraints: const BoxConstraints(maxWidth: 1080),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: children,
@@ -41,28 +46,17 @@ class PouchIntro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 14, 4, 24),
+    padding: const EdgeInsets.fromLTRB(4, 8, 4, 20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          eyebrow.toUpperCase(),
-          style: TextStyle(
-            color: context.pouchPalette.gold,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.6,
-          ),
-        ),
-        const SizedBox(height: 9),
-        Text(
           title,
           style: TextStyle(
             color: context.pouchPalette.ink,
-            fontFamily: 'serif',
-            fontSize: 38,
-            height: 1.12,
-            fontWeight: FontWeight.w500,
+            fontSize: 26,
+            height: 1.5,
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 9),
@@ -212,4 +206,154 @@ void showPouchUndoMessage(
         ),
       ),
     );
+}
+
+class PouchEmptyState extends StatelessWidget {
+  const PouchEmptyState({
+    required this.title,
+    required this.message,
+    this.action,
+    this.icon = Icons.account_balance_wallet_outlined,
+    super.key,
+  });
+  final String title, message;
+  final Widget? action;
+  final IconData icon;
+  @override
+  Widget build(BuildContext context) => PouchCard(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: context.pouchPalette.goldDeep),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Text(message, textAlign: TextAlign.center),
+          ),
+          if (action != null) ...[const SizedBox(height: 20), action!],
+        ],
+      ),
+    ),
+  );
+}
+
+class PouchStat extends StatelessWidget {
+  const PouchStat({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+    super.key,
+  });
+  final String label, value;
+  final bool emphasized;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: emphasized
+          ? context.pouchPalette.selection
+          : context.pouchPalette.cream,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: context.pouchPalette.muted)),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: emphasized ? 26 : 20,
+            fontWeight: FontWeight.w700,
+            color: context.pouchPalette.ink,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class PouchStatGrid extends StatelessWidget {
+  const PouchStatGrid({required this.children, super.key});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 900
+          ? 4
+          : constraints.maxWidth >= 480
+          ? 2
+          : 1;
+      final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+      return Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          for (final child in children) SizedBox(width: width, child: child),
+        ],
+      );
+    },
+  );
+}
+
+class PouchSummaryRow extends StatelessWidget {
+  const PouchSummaryRow({required this.label, required this.value, super.key});
+  final String label, value;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: AlignmentDirectional.centerStart,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 640),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: LayoutBuilder(
+          builder: (context, size) {
+            if (size.maxWidth < 360 ||
+                MediaQuery.textScalerOf(context).scale(14) > 20) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(color: context.pouchPalette.muted),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(color: context.pouchPalette.muted),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    ),
+  );
 }

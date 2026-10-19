@@ -176,6 +176,14 @@ fn international_profile_rejects_duplicate_indicators_and_wrong_units() {
 
 fn state() -> AppState {
     let mut state = AppState::fresh(date("2024-01-01"));
+    crate::periods::create(
+        &mut state,
+        date("2024-01-01"),
+        date("2024-02-01"),
+        crate::models::Recurrence::Monthly,
+        Calendar::Gregorian,
+    )
+    .unwrap();
     state.preferences.currency = Currency::Cad;
     state.preferences.calendar = Calendar::Gregorian;
     state.planned.push(PlannedItem {
@@ -188,6 +196,7 @@ fn state() -> AppState {
         status: PlannedStatus::Pending,
         paid_date: None,
         purchase_id: None,
+        essential_id: None,
     });
     state
 }
@@ -236,19 +245,32 @@ fn canada_uses_remaining_allocation_and_leaves_financial_state_unchanged() {
     let store = EconomicStore::new(directory.path());
     save(&store);
     let mut state = state();
-    state.plans[0].monthly_savings = amount(30_000);
+    let period = crate::periods::at(&state, state.start_date).expect("period");
+    state.plans.push(crate::models::BudgetPlan {
+        period_id: period.id,
+        effective: state.start_date,
+        savings: amount(30_000),
+    });
     state.income.push(IncomeEntry {
         id: "income".into(),
         date: state.start_date,
         amount: amount(30_000),
     });
     let today = date("2024-01-01");
+    crate::savings::reconcile(&mut state, today).expect("savings");
     let personal =
         crate::forecast::forecast(&state, today, "target", None).expect("personal forecast");
     assert!(personal.allocated > 0);
     let before = state.clone();
     let result =
         forecast(&state, &store.read(), today, "target", "CA", "CAD").expect("standard forecast");
+    crate::forecast::preview(&state, today, "target", true, false).expect("personal scenario");
+    let repeated = forecast(&state, &store.read(), today, "target", "CA", "CAD")
+        .expect("independent benchmark");
+    assert_eq!(
+        serde_json::to_value(&result).unwrap(),
+        serde_json::to_value(&repeated).unwrap()
+    );
     assert_eq!(result.remaining, personal.remaining);
     assert_eq!(result.converted_remaining, Some(personal.remaining));
     assert_eq!(result.monthly_net_income, Some(572_818));
@@ -413,7 +435,10 @@ fn json_backup_preserves_custom_profiles_and_rejects_invalid_assumptions() {
     let text = crate::backup::export_json(&state).expect("backup");
     assert_eq!(crate::backup::import_json(&text).expect("restored"), state);
     let mut document: serde_json::Value = serde_json::from_str(&text).expect("JSON");
-    document["economicAssumptions"]["IR"]["monthlyNetIncome"] = serde_json::json!(-1);
+    let income = document
+        .pointer_mut("/state/economicAssumptions/IR/monthlyNetIncome")
+        .expect("backup contains the saved income assumption");
+    *income = serde_json::json!(-1);
     assert!(crate::backup::import_json(&document.to_string()).is_err());
 }
 

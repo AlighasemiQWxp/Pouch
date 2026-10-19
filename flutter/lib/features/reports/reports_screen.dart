@@ -34,7 +34,7 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  _ReportMode _mode = _ReportMode.range;
+  _ReportMode _mode = _ReportMode.monthly;
   late String _from = _subtractDays(widget.today, 6, widget.snapshot.startDate);
   late String _through = widget.today;
   late String _anchor = widget.today;
@@ -70,26 +70,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
             children: [
               PouchSectionHeading(title: strings.text('reportBuilder')),
               const SizedBox(height: 14),
-              DropdownButtonFormField<_ReportMode>(
-                initialValue: _mode,
-                decoration: InputDecoration(
-                  labelText: strings.text('reportMode'),
-                ),
-                items: _ReportMode.values
-                    .map(
-                      (value) => DropdownMenuItem<_ReportMode>(
-                        value: value,
-                        child: Text(strings.text(_modeKey(value))),
-                      ),
-                    )
-                    .toList(growable: false),
-                onChanged: (value) => setState(() {
-                  _mode = value ?? _ReportMode.range;
-                  _report = null;
-                  _previewFailed = false;
-                  _reportLoading = false;
-                  _requestVersion++;
-                }),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final mode in [
+                    _ReportMode.monthly,
+                    _ReportMode.weekly,
+                    _ReportMode.range,
+                    _ReportMode.specific,
+                  ])
+                    ChoiceChip(
+                      label: Text(strings.text(_modeKey(mode))),
+                      selected: _mode == mode,
+                      onSelected: (_) => setState(() {
+                        _mode = mode;
+                        _report = null;
+                        _previewFailed = false;
+                        _reportLoading = false;
+                        _requestVersion++;
+                      }),
+                    ),
+                ],
               ),
               const SizedBox(height: 12),
               if (_mode == _ReportMode.range) _buildRangeInputs(),
@@ -213,8 +215,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       OutlinedButton.icon(
         onPressed: onPressed,
         icon: const Icon(Icons.calendar_month_rounded),
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
+        label: Wrap(
+          spacing: 6,
+          runSpacing: 4,
           children: [
             Text('${widget.strings.text(label)}: '),
             PouchDateLabel(
@@ -237,19 +240,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Expanded(
-                    child: Text(
-                      strings.text('reportTitle'),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                  Text(
+                    strings.text('reportTitle'),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
-                  IconButton(
-                    tooltip: strings.text('exportPdf'),
+                  TextButton.icon(
+                    label: Text(strings.text('exportPdf')),
                     onPressed: _printing ? null : () => _print(report),
                     icon: _printing
                         ? const SizedBox.square(
@@ -263,40 +265,76 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${strings.text('dayCount')}: ${localizeDigits('${report.dates.length}', strings.language)}',
-                style: TextStyle(color: context.pouchPalette.muted),
+              const SizedBox(height: 16),
+              PouchStatGrid(
+                children: [
+                  PouchStat(
+                    label: strings.text('totalSpent'),
+                    value: formatMoney(report.total, currency, strings),
+                    emphasized: true,
+                  ),
+                  PouchStat(
+                    label: strings.text('totalPlanned'),
+                    value: formatMoney(report.reserved, currency, strings),
+                  ),
+                  PouchStat(
+                    label: strings.text('dayCount'),
+                    value: localizeDigits(
+                      '${report.dates.length}',
+                      strings.language,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                '${strings.text('totalSpent')}: ${formatMoney(report.total, currency, strings)}',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${strings.text('totalPlanned')}: ${formatMoney(report.reserved, currency, strings)}',
-                style: TextStyle(color: context.pouchPalette.muted),
-              ),
-              const SizedBox(height: 13),
+              const SizedBox(height: 24),
               PouchSectionHeading(title: strings.text('categoryTotals')),
               for (final total in report.categories)
-                _amountRow(
-                  strings.text(total.category),
-                  total.amount,
-                  currency,
-                  strings,
+                Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        spacing: 8,
+                        children: [
+                          Text(strings.text(total.category)),
+                          Text(
+                            formatMoney(total.amount, currency, strings),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Semantics(
+                        label: strings.text(total.category),
+                        value: formatMoney(total.amount, currency, strings),
+                        child: LinearProgressIndicator(
+                          value: report.total > 0
+                              ? (total.amount / report.total).clamp(0.0, 1.0)
+                              : 0,
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               const SizedBox(height: 9),
-              PouchSectionHeading(title: strings.text('dailyTotals')),
-              for (final total in report.daily)
-                _amountRow(
-                  '',
-                  total.amount,
-                  currency,
-                  strings,
-                  date: total.date,
-                ),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(strings.text('dailyTotals')),
+                children: [
+                  for (final total in report.daily)
+                    _amountRow(
+                      '',
+                      total.amount,
+                      currency,
+                      strings,
+                      date: total.date,
+                    ),
+                ],
+              ),
               const SizedBox(height: 9),
               PouchSectionHeading(title: strings.text('details')),
               if (report.entries.isEmpty)
@@ -354,47 +392,48 @@ class _ReportsScreenState extends State<ReportsScreen> {
     String? date,
     String? subtitle,
   }) => Padding(
-    padding: const EdgeInsets.only(top: 8),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (date != null) ...[
-                    PouchDateLabel(
-                      bridge: widget.bridge,
-                      strings: strings,
-                      date: date,
-                      calendar: widget.snapshot.preferences.calendar,
-                    ),
-                    if (label.isNotEmpty) const Text(' · '),
-                  ],
-                  if (label.isNotEmpty)
-                    Flexible(
-                      child: Text(label, style: TextStyle(fontSize: 13)),
-                    ),
-                ],
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final detail = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (date != null)
+              PouchDateLabel(
+                bridge: widget.bridge,
+                strings: strings,
+                date: date,
+                calendar: widget.snapshot.preferences.calendar,
               ),
-              if (subtitle != null)
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: context.pouchPalette.muted,
-                    fontSize: 11,
-                  ),
+            if (label.isNotEmpty) Text(label),
+            if (subtitle != null)
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: context.pouchPalette.muted,
+                  fontSize: 12,
                 ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
+              ),
+          ],
+        );
+        final value = Text(
           formatMoney(amount, currency, strings),
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ],
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        );
+        if (constraints.maxWidth < 600) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [detail, const SizedBox(height: 4), value],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: detail),
+            const SizedBox(width: 12),
+            Flexible(child: value),
+          ],
+        );
+      },
     ),
   );
 

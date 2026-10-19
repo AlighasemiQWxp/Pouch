@@ -9,14 +9,6 @@ import 'pouch_platform.dart';
 
 typedef PouchMutation = Future<bool> Function(Future<PouchSnapshot> Function());
 
-class PouchExpenseDraft {
-  const PouchExpenseDraft(this.id, this.name, this.amount);
-
-  final String id;
-  final String name;
-  final String amount;
-}
-
 class PouchBridge {
   PouchBridge({PouchPlatform? platform})
     : _platform = platform ?? PouchPlatform.create();
@@ -84,8 +76,12 @@ class PouchBridge {
   Future<PouchSnapshot> snapshot() async =>
       PouchSnapshot.fromBridge(await _session.snapshot());
 
-  Future<PouchBudgetSummary> budgetSummary(String date) async =>
-      PouchBudgetSummary.fromBridge(await _session.budgetSummary(date: date));
+  Future<PouchBudgetSummary> budgetSummary(
+    String date, {
+    String? periodId,
+  }) async => PouchBudgetSummary.fromBridge(
+    await _session.budgetSummary(date: date, periodId: periodId),
+  );
 
   Future<PouchSnapshot> updatePreferences({
     required String country,
@@ -140,50 +136,45 @@ class PouchBridge {
         await _session.removePurchase(date: date, id: id),
       );
 
-  Future<PouchSnapshot> setDailyOverride(String date, String? amount) async =>
-      PouchSnapshot.fromBridge(
-        await _session.setDailyOverride(date: date, amount: amount),
-      );
-
-  Future<PouchSnapshot> recordIncome({
-    required String id,
-    required String date,
-    required String amount,
-  }) async => PouchSnapshot.fromBridge(
-    await _session.recordIncome(id: id, date: date, amount: amount),
-  );
-
   Future<PouchSnapshot> updateIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) async => PouchSnapshot.fromBridge(
-    await _session.updateIncome(id: id, date: date, amount: amount),
+    await _session.updateIncome(
+      id: id,
+      date: date,
+      amount: amount,
+      periodId: periodId,
+    ),
   );
 
   Future<PouchSnapshot> scheduleIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) async => PouchSnapshot.fromBridge(
-    await _session.scheduleIncome(id: id, date: date, amount: amount),
+    await _session.scheduleIncome(
+      id: id,
+      date: date,
+      amount: amount,
+      periodId: periodId,
+    ),
   );
 
   Future<PouchSnapshot> updateExpectedIncome({
     required String id,
     required String date,
     required String amount,
+    String? periodId,
   }) async => PouchSnapshot.fromBridge(
-    await _session.updateExpectedIncome(id: id, date: date, amount: amount),
-  );
-
-  Future<PouchSnapshot> markExpectedIncomeReceived({
-    required String id,
-    required String receivedDate,
-  }) async => PouchSnapshot.fromBridge(
-    await _session.markExpectedIncomeReceived(
+    await _session.updateExpectedIncome(
       id: id,
-      receivedDate: receivedDate,
+      date: date,
+      amount: amount,
+      periodId: periodId,
     ),
   );
 
@@ -202,31 +193,105 @@ class PouchBridge {
       PouchSnapshot.fromBridge(await _session.undoLastChange());
 
   Future<PouchSnapshot> saveBudgetPlan({
+    required String periodId,
     required String effective,
-    required String? salary,
-    required String dailyBudget,
-    required List<PouchExpenseDraft> expenses,
     required String savings,
-    required int payday,
   }) async => PouchSnapshot.fromBridge(
     await _session.saveBudgetPlan(
+      periodId: periodId,
       effective: effective,
-      salary: salary,
-      dailyBudget: dailyBudget,
-      expenseIds: expenses.map((value) => value.id).toList(growable: false),
-      expenseNames: expenses.map((value) => value.name).toList(growable: false),
-      expenseAmounts: expenses
-          .map((value) => value.amount)
-          .toList(growable: false),
       savings: savings,
-      payday: payday,
     ),
   );
+
+  Future<PouchPeriodView> periodView(String date) async =>
+      PouchPeriodView.fromBridge(await _session.periodView(date: date));
+
+  Future<PouchSnapshot> removePeriod(String id) async =>
+      PouchSnapshot.fromBridge(await _session.removePeriod(id: id));
+
+  Future<PouchSnapshot> savePeriod({
+    String? id,
+    required String start,
+    required String kind,
+    int customDays = 7,
+    String? through,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.savePeriod(
+      id: id,
+      start: start,
+      kind: kind,
+      customDays: customDays,
+      through: through,
+    ),
+  );
+
+  Future<PouchSnapshot> receiveIncome({
+    required String id,
+    required String date,
+    required String amount,
+    String? periodId,
+    required bool startNew,
+    String kind = 'monthly',
+    int customDays = 7,
+    String? through,
+    bool expected = false,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.receiveIncome(
+      receipt: ReceiveIncomeRequest(
+        id: id,
+        date: date,
+        amount: amount,
+        periodId: periodId,
+        startNew: startNew,
+        kind: kind,
+        customDays: customDays,
+        through: through,
+        expected: expected,
+      ),
+    ),
+  );
+
+  Future<PouchSnapshot> saveEssentialExpense({
+    required String id,
+    required String name,
+    required String amount,
+    required String date,
+    required String kind,
+    required int customDays,
+  }) async => PouchSnapshot.fromBridge(
+    await _session.saveEssentialExpense(
+      id: id,
+      name: name,
+      amount: amount,
+      date: date,
+      kind: kind,
+      customDays: customDays,
+    ),
+  );
+
+  Future<PouchSnapshot> stopEssentialExpense(String id, String date) async =>
+      PouchSnapshot.fromBridge(
+        await _session.stopEssentialExpense(id: id, date: date),
+      );
+
+  Future<void> resetIncompatibleStorage() async {
+    final bootstrap = await _platform.bootstrap();
+    try {
+      await economic_api.resetIncompatibleStorage(
+        applicationDataDirectory: bootstrap.directory,
+      );
+      await _platform.markDataImportComplete();
+    } finally {
+      await _platform.close();
+    }
+  }
 
   Future<PouchSnapshot> savePlanned({
     required String id,
     required String description,
     required String amount,
+    String? periodId,
     required String category,
     required String kind,
     required String date,
@@ -235,6 +300,7 @@ class PouchBridge {
       id: id,
       description: description,
       amount: amount,
+      periodId: periodId,
       category: category,
       kind: kind,
       date: date,
@@ -347,12 +413,14 @@ class PouchBridge {
     String selectedId, {
     bool recommended = false,
     bool incomeRequired = false,
+    String? periodId,
   }) async => PouchFinancialForecast.fromBridge(
     await _session.financialForecast(
       asOf: asOf,
       selectedId: selectedId,
       recommended: recommended,
       incomeRequired: incomeRequired,
+      periodId: periodId,
     ),
   );
 

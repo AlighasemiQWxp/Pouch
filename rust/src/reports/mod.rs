@@ -5,6 +5,7 @@ use chrono::Datelike;
 use crate::{
     AppState, Date, PouchError, PouchResult, calendar,
     models::{Calendar, Category, PlannedKind, PlannedStatus, WeekStart},
+    pagination::{Page, Pagination},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -47,6 +48,22 @@ pub struct Report {
     pub planned: Vec<PlannedReportEntry>,
     pub total: i64,
     pub reserved: i64,
+}
+
+impl Report {
+    pub fn entries_page(&self, pagination: Pagination) -> PouchResult<Page<ReportEntry>> {
+        pagination.validate()?;
+        let mut items = self.entries.clone();
+        items.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
+        pagination.paginate(items)
+    }
+
+    pub fn planned_page(&self, pagination: Pagination) -> PouchResult<Page<PlannedReportEntry>> {
+        pagination.validate()?;
+        let mut items = self.planned.clone();
+        items.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
+        pagination.paginate(items)
+    }
 }
 
 pub enum ReportPeriod {
@@ -134,9 +151,11 @@ pub fn build(state: &AppState, selected: Vec<Date>) -> PouchResult<Report> {
     }
     let mut planned = Vec::new();
     let mut reserved = 0_i64;
-    for item in &state.planned {
+    let horizon = dates.last().copied().ok_or(PouchError::InvalidReport)?;
+    for item in &crate::expenses::obligations(state, horizon)? {
         if item.kind == PlannedKind::Expense
-            && item.status == PlannedStatus::Pending
+            && (item.status == PlannedStatus::Pending
+                || item.paid_date.is_some_and(|paid| paid > horizon))
             && included.contains(&item.date)
         {
             reserved = add_amount(reserved, item.amount.hundredths())?;
@@ -173,6 +192,57 @@ fn add_amount(current: i64, next: i64) -> PouchResult<i64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn detail_pages_preserve_complete_report_totals() {
+        use crate::{
+            AppState, Money,
+            models::{Category, PlannedKind, Purchase},
+            pagination::Pagination,
+        };
+
+        let date = Date::parse_iso("2024-01-01").expect("valid date");
+        let mut state = AppState::fresh(date);
+        for id in ["b", "a"] {
+            state
+                .days
+                .entry(date)
+                .or_default()
+                .purchases
+                .push(Purchase {
+                    id: id.into(),
+                    description: id.into(),
+                    amount: Money::from_hundredths(100).expect("valid amount"),
+                    category: Category::Other,
+                    funded_by_goal: false,
+                });
+            state.planned.push(crate::expenses::create_planned(
+                id.into(),
+                id.into(),
+                Money::from_hundredths(300).expect("valid amount"),
+                Category::Other,
+                PlannedKind::Expense,
+                date,
+            ));
+        }
+        let report = super::build(&state, vec![date]).expect("valid report");
+        let before = report.clone();
+        let pagination = Pagination {
+            page: 1,
+            page_size: 1,
+        };
+        let entries = report.entries_page(pagination).expect("valid page");
+        let planned = report.planned_page(pagination).expect("valid page");
+        assert_eq!(entries.items.len(), 1);
+        assert_eq!(planned.items.len(), 1);
+        assert_eq!(entries.items[0].id, "a");
+        assert_eq!(planned.items[0].id, "a");
+        assert_eq!(entries.total_items, 2);
+        assert_eq!(planned.total_items, 2);
+        assert_eq!(report.total, 200);
+        assert_eq!(report.reserved, 600);
+        assert_eq!(report, before);
+    }
+
     use super::{ReportPeriod, dates};
     use crate::{
         Date,

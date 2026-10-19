@@ -7,7 +7,10 @@ import '../../core/pouch_formatters.dart';
 import '../../core/pouch_models.dart';
 import '../../core/pouch_theme.dart';
 import '../../widgets/pouch_widgets.dart';
+import '../../widgets/pouch_motion.dart';
+import '../../widgets/pouch_period_selector.dart';
 import '../../widgets/pouch_date_picker.dart';
+import 'period_controls.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({
@@ -42,7 +45,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   late final TextEditingController _savings = TextEditingController();
   late final TextEditingController _incomeAmount = TextEditingController();
-  late final List<_ExpenseDraft> _expenses = [];
+  PouchPeriodView? _periodView;
+  late String _planDate = widget.today;
+  int _periodRequest = 0;
+  bool _periodLoading = false;
   late String _effective = widget.today;
   late String _incomeDate = widget.today;
   late Future<PouchCalendarMonth> _salaryMonth = widget.bridge.calendarMonth(
@@ -66,29 +72,56 @@ class _BudgetScreenState extends State<BudgetScreen> {
   String? _editingExpectedIncomeId;
   String? _editingPlanEffective;
   bool _advancedDate = false;
+  bool _deletingSavings = false;
+  String? _observedPeriodId;
+  final _incomeButton = GlobalKey();
+  final _savingsButton = GlobalKey();
 
   @override
   void initState() {
     super.initState();
-    final plan = widget.snapshot.planAt(widget.today);
-    _savings.text = amountInput(
-      plan.savings,
-      language: widget.strings.language,
-    );
-    for (final expense in plan.expenses) {
-      _expenses.add(
-        _ExpenseDraft(
-          expense.id,
-          expense.name,
-          amountInput(expense.amount, language: widget.strings.language),
-        ),
-      );
+    _loadPlan(widget.snapshot.currentPlan);
+    if (widget.snapshot.currentPeriod != null) {
+      _selectPeriod(widget.today);
+    } else if (widget.snapshot.periods.isNotEmpty) {
+      _selectPeriod(widget.snapshot.periods.last.start);
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final selected = selectedPouchPeriod(
+      widget.snapshot,
+      PouchPeriodScope.maybeOf(context)?.periodId,
+    );
+    if (selected != null && selected.id != _observedPeriodId) {
+      _observedPeriodId = selected.id;
+      _selectPeriod(selected.start);
+    }
+  }
+
+  void _choosePeriodAtDate(String date) {
+    _selectPeriod(date, publish: true);
   }
 
   @override
   void didUpdateWidget(covariant BudgetScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.snapshot.revision != widget.snapshot.revision) {
+      final selected = selectedPouchPeriod(
+        widget.snapshot,
+        PouchPeriodScope.maybeOf(context)?.periodId ?? _periodView?.period.id,
+      );
+      if (selected != null) {
+        _selectPeriod(selected.start);
+      } else {
+        _periodRequest++;
+        _periodView = null;
+        _periodLoading = false;
+        _observedPeriodId = null;
+      }
+    }
     if (oldWidget.snapshot.preferences.calendar !=
             widget.snapshot.preferences.calendar ||
         oldWidget.snapshot.startDate != widget.snapshot.startDate ||
@@ -117,416 +150,296 @@ class _BudgetScreenState extends State<BudgetScreen> {
   void dispose() {
     _savings.dispose();
     _incomeAmount.dispose();
-    for (final expense in _expenses) {
-      expense.dispose();
-    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final strings = widget.strings;
-    final income = [...widget.snapshot.income]
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final expectedIncome = [...widget.snapshot.expectedIncome]
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final plans = [...widget.snapshot.plans]
-      ..sort((a, b) => a.effective.compareTo(b.effective));
-    final isEditingIncome =
+    final t = widget.strings;
+    final editing =
         _editingIncomeId != null || _editingExpectedIncomeId != null;
-    final isExpectedIncome =
+    final expected =
         _editingExpectedIncomeId != null ||
         _incomeDate.compareTo(widget.today) > 0;
-    var incomeActionLabel = strings.text(
-      isExpectedIncome ? 'saveExpectedIncome' : 'saveSalary',
+    final view = _periodView;
+    final income = view?.income ?? widget.snapshot.income;
+    final expectedIncome =
+        view?.expectedIncome ?? widget.snapshot.expectedIncome;
+    final planRevisions = widget.snapshot.plans.where(
+      (plan) => plan.periodId == view?.period.id,
     );
-    var incomeActionIcon = Icons.add_rounded;
-    if (isEditingIncome) {
-      incomeActionLabel = strings.text('saveChanges');
-      incomeActionIcon = Icons.save_outlined;
-    }
+    final incomeForm = PouchCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PouchSectionHeading(
+            title: t.text(editing ? 'editIncome' : 'recordIncomeTitle'),
+          ),
+          const SizedBox(height: 8),
+          _buildSalaryCalendar(income),
+          const SizedBox(height: 12),
+          Text(t.text('incomeCalendarEntryHint')),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _incomeAmount,
+            inputFormatters: [PouchMoneyInputFormatter(t.language)],
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: t.text(
+                expected ? 'expectedIncomeAmount' : 'salaryAmount',
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          PouchPrimaryButton(
+            key: _incomeButton,
+            label: t.text(editing ? 'saveIncome' : 'addIncome'),
+            icon: Icons.add_rounded,
+            onPressed: _periodLoading ? null : _recordIncome,
+          ),
+          if (expected)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(t.text('expectedIncomeHint')),
+            ),
+          if (editing)
+            TextButton(
+              onPressed: _cancelIncomeEdit,
+              child: Text(t.text('cancel')),
+            ),
+        ],
+      ),
+    );
     return PouchPage(
       children: [
         PouchIntro(
-          eyebrow: strings.text('budgetLabel'),
-          title: strings.text('planTitle'),
-          description: strings.text('budgetPageHint'),
+          eyebrow: t.text('budgetLabel'),
+          title: t.text('planTitle'),
+          description: t.text('budgetPageHint'),
         ),
-        PouchCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PouchSectionHeading(title: strings.text('salaryCalendar')),
-              const SizedBox(height: 6),
-              Text(
-                strings.text('incomeStart'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  height: 1.55,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 15),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 190,
-                    child: TextField(
-                      controller: _incomeAmount,
-                      inputFormatters: [
-                        PouchMoneyInputFormatter(widget.strings.language),
-                      ],
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: strings.text(
-                          isExpectedIncome
-                              ? 'expectedIncomeAmount'
-                              : 'salaryAmount',
-                        ),
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _pickIncomeDate,
-                    icon: const Icon(Icons.calendar_month_rounded),
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('${strings.text('date')}: '),
-                        PouchDateLabel(
-                          bridge: widget.bridge,
-                          strings: strings,
-                          date: _incomeDate,
-                          calendar: widget.snapshot.preferences.calendar,
-                        ),
-                      ],
-                    ),
-                  ),
-                  PouchPrimaryButton(
-                    label: incomeActionLabel,
-                    icon: incomeActionIcon,
-                    onPressed: _recordIncome,
-                  ),
-                  if (isExpectedIncome)
-                    SizedBox(
-                      width: 300,
-                      child: Text(
-                        strings.text('expectedIncomeHint'),
-                        style: TextStyle(
-                          color: context.pouchPalette.muted,
-                          fontSize: 12,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  if (isEditingIncome)
-                    TextButton(
-                      onPressed: _cancelIncomeEdit,
-                      child: Text(strings.text('cancel')),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _buildSalaryCalendar(income),
-              const SizedBox(height: 12),
-              if (income.isEmpty && expectedIncome.isEmpty)
-                Text(
-                  strings.text('noSalaryEntries'),
-                  style: TextStyle(color: context.pouchPalette.muted),
-                ),
-              for (final entry in income)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.payments_outlined,
-                    color: context.pouchPalette.goldDeep,
-                  ),
-                  title: Text(
-                    formatMoney(
-                      entry.amount,
-                      widget.snapshot.preferences.currency,
-                      strings,
-                    ),
-                  ),
-                  subtitle: PouchDateLabel(
-                    bridge: widget.bridge,
-                    strings: strings,
-                    date: entry.date,
-                    calendar: widget.snapshot.preferences.calendar,
-                  ),
-                  trailing: Wrap(
-                    spacing: 2,
-                    children: [
-                      IconButton(
-                        tooltip: strings.text('edit'),
-                        onPressed: () => _editIncome(entry),
-                        icon: Icon(
-                          Icons.edit_outlined,
-                          color: context.pouchPalette.goldDeep,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: strings.text('deleteSalary'),
-                        onPressed: () => _removeIncome(entry),
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: context.pouchPalette.goldDeep,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              for (final entry in expectedIncome)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    Icons.event_note_outlined,
-                    color: context.pouchPalette.goldDeep,
-                  ),
-                  title: Text(
-                    formatMoney(
-                      entry.amount,
-                      widget.snapshot.preferences.currency,
-                      strings,
-                    ),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(strings.text('expectedShort')),
-                      PouchDateLabel(
-                        bridge: widget.bridge,
-                        strings: strings,
-                        date: entry.date,
-                        calendar: widget.snapshot.preferences.calendar,
-                      ),
-                    ],
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    tooltip: strings.text('moreOptions'),
-                    onSelected: (action) {
-                      if (action == 'receive') {
-                        _markExpectedIncomeReceived(entry);
-                      } else if (action == 'edit') {
-                        _editExpectedIncome(entry);
-                      } else if (action == 'delete') {
-                        _removeExpectedIncome(entry);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'receive',
-                        child: Text(strings.text('markIncomeReceived')),
-                      ),
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Text(strings.text('edit')),
-                      ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text(strings.text('deleteSalary')),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+        PeriodControls(
+          bridge: widget.bridge,
+          snapshot: widget.snapshot,
+          strings: t,
+          today: widget.today,
+          view: view,
+          run: widget.run,
+          select: _choosePeriodAtDate,
         ),
-        const SizedBox(height: 14),
-        PouchCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PouchSectionHeading(title: strings.text('monthlyPlan')),
-              const SizedBox(height: 7),
-              Text(
-                strings.text('planHint'),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 12,
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 15),
-              if (plans.length > 1) ...[
-                Text(
-                  strings.text('scheduledPlans'),
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                for (final plan in plans.where(
-                  (value) => value.effective.compareTo(widget.today) > 0,
-                ))
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Row(
-                      children: [
-                        Text('${strings.text('effective')}: '),
-                        PouchDateLabel(
-                          bridge: widget.bridge,
-                          strings: strings,
-                          date: plan.effective,
-                          calendar: widget.snapshot.preferences.calendar,
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      formatMoney(
-                        plan.savings,
-                        widget.snapshot.preferences.currency,
-                        strings,
-                      ),
-                    ),
-                    trailing: Wrap(
-                      spacing: 2,
-                      children: [
-                        IconButton(
-                          tooltip: strings.text('edit'),
-                          onPressed: () => _editScheduledPlan(plan),
-                          icon: Icon(
-                            Icons.edit_outlined,
-                            color: context.pouchPalette.goldDeep,
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: strings.text('delete'),
-                          onPressed: () => _removeScheduledPlan(plan),
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            color: context.pouchPalette.goldDeep,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+        const SizedBox(height: 24),
+        if (_periodLoading) const LinearProgressIndicator(),
+        incomeForm,
+        const SizedBox(height: 20),
+        if (view != null) ...[
+          PouchCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PouchSectionHeading(title: t.text('periodSavings')),
+                PouchPeriodNotice(strings: t, period: view.period),
                 const SizedBox(height: 8),
-              ],
-              TextField(
-                controller: _savings,
-                inputFormatters: [
-                  PouchMoneyInputFormatter(widget.strings.language),
-                ],
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: strings.text('monthlySavings'),
-                  helperText: strings.text('savingsHint'),
-                ),
-              ),
-              const SizedBox(height: 14),
-              PouchSectionHeading(
-                title: strings.text('commitments'),
-                trailing: IconButton(
-                  tooltip: strings.text('addExpense'),
-                  onPressed: () => setState(
-                    () => _expenses.add(_ExpenseDraft(_newId(), '', '')),
+                Text(t.text('savingsHint')),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _savings,
+                  inputFormatters: [PouchMoneyInputFormatter(t.language)],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                  icon: Icon(
-                    Icons.add_circle_outline_rounded,
-                    color: context.pouchPalette.goldDeep,
+                  decoration: InputDecoration(
+                    labelText: t.text('periodSavings'),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              if (_expenses.isEmpty)
-                Text(
-                  strings.text('empty'),
-                  style: TextStyle(color: context.pouchPalette.muted),
-                )
-              else
-                for (final expense in _expenses)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 9),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: expense.name,
-                            decoration: InputDecoration(
-                              labelText: strings.text('expenseName'),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 9),
-                        SizedBox(
-                          width: 150,
-                          child: TextField(
-                            controller: expense.amount,
-                            inputFormatters: [
-                              PouchMoneyInputFormatter(widget.strings.language),
-                            ],
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: strings.text('amount'),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: strings.text('remove'),
-                          onPressed: () => setState(() {
-                            _expenses.remove(expense);
-                            expense.dispose();
-                          }),
-                          icon: Icon(
-                            Icons.remove_circle_outline_rounded,
-                            color: context.pouchPalette.danger,
-                          ),
-                        ),
-                      ],
+                ExpansionTile(
+                  key: ValueKey('effective-options-$_advancedDate'),
+                  initiallyExpanded: _advancedDate,
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(t.text('moreOptions')),
+                  children: [
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t.text('advancedDate')),
+                      value: _advancedDate,
+                      onChanged: (value) =>
+                          setState(() => _advancedDate = value!),
                     ),
-                  ),
-              const SizedBox(height: 14),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _advancedDate,
-                onChanged: (value) =>
-                    setState(() => _advancedDate = value ?? false),
-                title: Text(strings.text('advancedDate')),
-                subtitle: Text(strings.text('advancedDateHint')),
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              if (_advancedDate)
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: OutlinedButton.icon(
-                    onPressed: _pickEffectiveDate,
-                    icon: const Icon(Icons.event_available_rounded),
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('${strings.text('effective')}: '),
-                        PouchDateLabel(
+                    if (_advancedDate)
+                      TextButton(
+                        onPressed: _pickEffectiveDate,
+                        child: PouchDateLabel(
                           bridge: widget.bridge,
-                          strings: strings,
+                          strings: t,
                           date: _effective,
                           calendar: widget.snapshot.preferences.calendar,
                         ),
-                      ],
-                    ),
+                      ),
+                  ],
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: PouchPrimaryButton(
+                    key: _savingsButton,
+                    label: t.text('savePlan'),
+                    onPressed: _periodLoading ? null : _savePlan,
                   ),
                 ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: PouchPrimaryButton(
-                  label: strings.text('savePlan'),
-                  icon: Icons.save_outlined,
-                  onPressed: _savePlan,
+                const SizedBox(height: 12),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(t.text('budgetBreakdown')),
+                  children: [
+                    for (final entry in [
+                      ('freeToSpend', view.budget.remaining),
+                      ('reservedExpenses', view.budget.fundedExpenses),
+                      ('protectedSavings', view.budget.savings),
+                      ('carry', view.budget.carry),
+                    ])
+                      PouchSummaryRow(
+                        label: t.text(entry.$1),
+                        value: _money(entry.$2),
+                      ),
+                    Text(t.text('savingsSetAsideHint')),
+                  ],
                 ),
-              ),
+                if (planRevisions.isNotEmpty)
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    key: const ValueKey('savings-history'),
+                    title: Text(t.text('planHistory')),
+                    children: [
+                      for (final plan in planRevisions)
+                        ListTile(
+                          key: ValueKey('savings-plan-${plan.effective}'),
+                          title: Text(_money(plan.savings)),
+                          subtitle: PouchDateLabel(
+                            bridge: widget.bridge,
+                            strings: t,
+                            date: plan.effective,
+                            calendar: widget.snapshot.preferences.calendar,
+                          ),
+                          trailing: Wrap(
+                            children: [
+                              IconButton(
+                                tooltip: t.text('edit'),
+                                onPressed: _deletingSavings
+                                    ? null
+                                    : () => _editSavings(plan),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              IconButton(
+                                key: ValueKey(
+                                  'delete-savings-${plan.effective}',
+                                ),
+                                tooltip: t.text('delete'),
+                                onPressed: _deletingSavings
+                                    ? null
+                                    : () => _deleteSavings(plan),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                if (view.obligations.isNotEmpty)
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(t.text('periodObligations')),
+                    children: [
+                      for (final item in view.obligations)
+                        ListTile(
+                          title: Text(item.description),
+                          subtitle: PouchDateLabel(
+                            bridge: widget.bridge,
+                            strings: t,
+                            date: item.date,
+                            calendar: widget.snapshot.preferences.calendar,
+                          ),
+                          trailing: Text(_money(item.amount)),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        PouchCard(
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(t.text('incomeHistory')),
+            children: [
+              if (income.isEmpty && expectedIncome.isEmpty)
+                Text(t.text('noIncomeYet')),
+              for (final item in income.reversed)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.south_west_rounded),
+                  title: Text(_money(item.amount)),
+                  subtitle: PouchDateLabel(
+                    bridge: widget.bridge,
+                    strings: t,
+                    date: item.date,
+                    calendar: widget.snapshot.preferences.calendar,
+                  ),
+                  trailing: Wrap(
+                    children: [
+                      IconButton(
+                        tooltip: t.text('edit'),
+                        onPressed: () => _editIncome(item),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        tooltip: t.text('delete'),
+                        onPressed: () => _removeIncome(item),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                ),
+              for (final item in expectedIncome.reversed)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.schedule_rounded),
+                  title: Text(
+                    '${t.text('expectedShort')} · ${_money(item.amount)}',
+                  ),
+                  subtitle: PouchDateLabel(
+                    bridge: widget.bridge,
+                    strings: t,
+                    date: item.date,
+                    calendar: widget.snapshot.preferences.calendar,
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (action) {
+                      if (action == 'receive') {
+                        _markExpectedIncomeReceived(item);
+                      }
+                      if (action == 'edit') _editExpectedIncome(item);
+                      if (action == 'delete') _removeExpectedIncome(item);
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'receive',
+                        child: Text(t.text('receivedIncome')),
+                      ),
+                      PopupMenuItem(value: 'edit', child: Text(t.text('edit'))),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text(t.text('delete')),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
       ],
     );
   }
+
+  String _money(int value) =>
+      formatMoney(value, widget.snapshot.preferences.currency, widget.strings);
 
   Widget _buildSalaryCalendar(List<PouchIncome> income) => Container(
     padding: const EdgeInsets.all(12),
@@ -561,10 +474,27 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 7;
             final cellCount = ((firstOffset + month.dayCount + 6) ~/ 7) * 7;
             final incomeByDate = {for (final item in income) item.date: item};
+            final totalsByDate = <String, int>{};
+            for (final item in income) {
+              totalsByDate.update(
+                item.date,
+                (amount) => amount + item.amount,
+                ifAbsent: () => item.amount,
+              );
+            }
+            final expectedIncome =
+                _periodView?.expectedIncome ?? widget.snapshot.expectedIncome;
             final expectedByDate = {
-              for (final item in widget.snapshot.expectedIncome)
-                item.date: item,
+              for (final item in expectedIncome) item.date: item,
             };
+            final expectedTotalsByDate = <String, int>{};
+            for (final item in expectedIncome) {
+              expectedTotalsByDate.update(
+                item.date,
+                (amount) => amount + item.amount,
+                ifAbsent: () => item.amount,
+              );
+            }
             final weekdays = List.generate(7, (index) {
               final weekday =
                   (widget.snapshot.preferences.weekStart + index) % 7;
@@ -638,10 +568,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         .substring(0, 10);
                     final entry = incomeByDate[date];
                     final expected = expectedByDate[date];
-                    final incomeAmount = entry?.amount ?? expected?.amount;
+                    final incomeAmount = totalsByDate[date];
+                    final expectedAmount = expectedTotalsByDate[date];
                     final selected = date == _incomeDate;
                     final enabled = date.compareTo(firstPouchRecordDate) >= 0;
                     return InkWell(
+                      key: ValueKey('income-date-$date'),
                       onTap: enabled
                           ? () => _selectIncomeDate(
                               date,
@@ -658,7 +590,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         decoration: BoxDecoration(
                           color: selected
                               ? context.pouchPalette.goldDeep
-                              : null,
+                              : (_periodView != null &&
+                                        date.compareTo(
+                                              _periodView!.period.start,
+                                            ) >=
+                                            0 &&
+                                        date.compareTo(
+                                              _periodView!.period.end,
+                                            ) <=
+                                            0
+                                    ? context.pouchPalette.surfaceWarm
+                                    : null),
                           border: entry == null && expected == null
                               ? null
                               : Border.all(
@@ -685,7 +627,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            if (incomeAmount != null) ...[
+                            if (expectedAmount != null && expectedAmount > 0)
+                              Text(
+                                '${widget.strings.text('expectedShort')}: ${formatMoney(expectedAmount, widget.snapshot.preferences.currency, widget.strings)}',
+                                maxLines: 1,
+                                style: const TextStyle(fontSize: 8),
+                              ),
+                            if (incomeAmount != null && incomeAmount > 0) ...[
                               const SizedBox(height: 1),
                               Text(
                                 widget.strings.text(
@@ -805,41 +753,67 @@ class _BudgetScreenState extends State<BudgetScreen> {
   int _calendarMonthIndex(PouchCalendarMonth month) =>
       month.year * 12 + month.month;
 
-  Future<void> _savePlan() async {
-    final expenses = <PouchExpenseDraft>[];
-    for (final expense in _expenses) {
-      if (expense.name.text.trim().isEmpty &&
-          expense.amount.text.trim().isEmpty) {
-        continue;
+  Future<void> _selectPeriod(String date, {bool publish = false}) async {
+    final request = ++_periodRequest;
+    setState(() => _periodLoading = true);
+    try {
+      final view = await widget.bridge.periodView(date);
+      if (!mounted || request != _periodRequest) return;
+      setState(() {
+        _periodLoading = false;
+        _periodView = view;
+        _planDate = view.budget.date;
+        _effective = view.budget.date;
+        _editingPlanEffective = null;
+        _advancedDate = false;
+        _loadPlan(view.plan);
+        if (publish) _observedPeriodId = view.period.id;
+      });
+      if (publish) PouchPeriodScope.maybeOf(context)?.onChanged(view.period.id);
+    } catch (error) {
+      if (mounted && request == _periodRequest) {
+        setState(() => _periodLoading = false);
+        if (widget.snapshot.currentPeriod == null) {
+          setState(() => _periodView = null);
+        }
+        setState(() => _periodView = null);
+        showPouchMessage(context, widget.strings, 'chooseHorizon');
       }
-      expenses.add(
-        PouchExpenseDraft(
-          expense.id,
-          expense.name.text.trim(),
-          expense.amount.text.trim(),
-        ),
-      );
+    }
+  }
+
+  Future<void> _savePlan() async {
+    final period = _periodView?.period ?? widget.snapshot.currentPeriod;
+    if (period == null) {
+      showPouchMessage(context, widget.strings, 'chooseHorizon');
+      return;
     }
     final effective =
-        _editingPlanEffective ?? (_advancedDate ? _effective : widget.today);
+        _editingPlanEffective ?? (_advancedDate ? _effective : _planDate);
+    PouchBudgetPlan? previousPlan;
+    for (final plan in widget.snapshot.plans) {
+      if (plan.periodId == period.id &&
+          plan.effective.compareTo(effective) <= 0 &&
+          (previousPlan == null ||
+              plan.effective.compareTo(previousPlan.effective) > 0)) {
+        previousPlan = plan;
+      }
+    }
+    final previousSavings = previousPlan?.savings ?? 0;
+    final enteredSavings =
+        NumberFormat.decimalPattern(widget.strings.language)
+            .tryParse(_savings.text) ??
+        0;
     final accepted = await widget.run(
       () => widget.bridge.saveBudgetPlan(
+        periodId: period.id,
         effective: effective,
-        salary: null,
-        dailyBudget: '0',
-        expenses: expenses,
         savings: _savings.text.trim().isEmpty ? '0' : _savings.text.trim(),
-        payday: 1,
       ),
     );
     if (accepted && mounted) {
-      if (_editingPlanEffective != null) {
-        setState(() {
-          _editingPlanEffective = null;
-          _advancedDate = false;
-          _effective = widget.today;
-          _loadPlan(widget.snapshot.planAt(widget.today));
-        });
+      if (enteredSavings > previousSavings / 100) {
+        PouchMotion.celebrate(context, anchor: _savingsButton);
       }
       showPouchMessage(context, widget.strings, 'settingsSaved');
     }
@@ -850,23 +824,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
       plan.savings,
       language: widget.strings.language,
     );
-    for (final expense in _expenses) {
-      expense.dispose();
-    }
-    _expenses
-      ..clear()
-      ..addAll(
-        plan.expenses.map(
-          (expense) => _ExpenseDraft(
-            expense.id,
-            expense.name,
-            amountInput(expense.amount, language: widget.strings.language),
-          ),
-        ),
-      );
   }
 
-  void _editScheduledPlan(PouchBudgetPlan plan) {
+  void _editSavings(PouchBudgetPlan plan) {
     setState(() {
       _editingPlanEffective = plan.effective;
       _effective = plan.effective;
@@ -875,29 +835,29 @@ class _BudgetScreenState extends State<BudgetScreen> {
     });
   }
 
-  Future<void> _removeScheduledPlan(PouchBudgetPlan plan) async {
+  Future<void> _deleteSavings(PouchBudgetPlan plan) async {
+    if (_deletingSavings) return;
     final approved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(widget.strings.text('delete')),
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PouchDateLabel(
-              bridge: widget.bridge,
-              strings: widget.strings,
-              date: plan.effective,
-              calendar: widget.snapshot.preferences.calendar,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              formatMoney(
-                plan.savings,
-                widget.snapshot.preferences.currency,
-                widget.strings,
+        title: Text(widget.strings.text('deleteSavings')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.strings.text('deleteSavingsHint')),
+              const SizedBox(height: 16),
+              Text(_money(plan.savings)),
+              const SizedBox(height: 4),
+              PouchDateLabel(
+                bridge: widget.bridge,
+                strings: widget.strings,
+                date: plan.effective,
+                calendar: widget.snapshot.preferences.calendar,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -911,31 +871,60 @@ class _BudgetScreenState extends State<BudgetScreen> {
         ],
       ),
     );
-    if (approved != true) return;
-    final deleted = await widget.run(
-      () => widget.bridge.removeBudgetPlan(plan.effective),
-    );
-    if (!deleted || !mounted) return;
-    if (_editingPlanEffective == plan.effective) {
-      setState(() {
-        _editingPlanEffective = null;
-        _advancedDate = false;
-        _effective = widget.today;
-        _loadPlan(widget.snapshot.planAt(widget.today));
-      });
+    if (approved != true || !mounted) return;
+    setState(() => _deletingSavings = true);
+    try {
+      final deleted = await widget.run(
+        () => widget.bridge.removeBudgetPlan(plan.effective),
+      );
+      if (!deleted || !mounted) return;
+      if (_editingPlanEffective == plan.effective) {
+        setState(() {
+          _editingPlanEffective = null;
+          _advancedDate = false;
+          _effective = _planDate;
+          _loadPlan(_periodView?.plan ?? widget.snapshot.currentPlan);
+        });
+      }
+      showPouchUndoMessage(context, widget.strings, 'deleted', widget.undo);
+    } finally {
+      if (mounted) setState(() => _deletingSavings = false);
     }
-    showPouchUndoMessage(context, widget.strings, 'deleted', widget.undo);
   }
 
   Future<void> _recordIncome() async {
+    final periodId = _periodView?.period.id;
+    if (periodId == null) {
+      showPouchMessage(context, widget.strings, 'choosePeriodHint');
+      return;
+    }
     final editingId = _editingIncomeId;
     final editingExpectedId = _editingExpectedIncomeId;
+    if (editingId == null &&
+        editingExpectedId == null &&
+        _incomeDate.compareTo(widget.today) <= 0) {
+      final accepted = await _receive(
+        _newId(),
+        _incomeDate,
+        _incomeAmount.text.trim(),
+      );
+      if (accepted && mounted) {
+        _incomeAmount.clear();
+        await _selectPeriod(
+          widget.snapshot.periods
+              .firstWhere((period) => period.id == periodId)
+              .start,
+        );
+      }
+      return;
+    }
     final accepted = await widget.run(() {
       if (editingExpectedId != null) {
         return widget.bridge.updateExpectedIncome(
           id: editingExpectedId,
           date: _incomeDate,
           amount: _incomeAmount.text.trim(),
+          periodId: periodId,
         );
       }
       if (editingId != null) {
@@ -943,6 +932,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           id: editingId,
           date: _incomeDate,
           amount: _incomeAmount.text.trim(),
+          periodId: periodId,
         );
       }
       if (_incomeDate.compareTo(widget.today) > 0) {
@@ -950,15 +940,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
           id: _newId(),
           date: _incomeDate,
           amount: _incomeAmount.text.trim(),
+          periodId: periodId,
         );
       }
-      return widget.bridge.recordIncome(
-        id: _newId(),
-        date: _incomeDate,
-        amount: _incomeAmount.text.trim(),
-      );
+      throw StateError('Receipt choice must be resolved first');
     });
     if (accepted && mounted) {
+      PouchMotion.celebrate(context, anchor: _incomeButton);
       _incomeAmount.clear();
       setState(() {
         _editingIncomeId = null;
@@ -1134,12 +1122,21 @@ class _BudgetScreenState extends State<BudgetScreen> {
       firstDate: firstPouchRecordDate,
       lastDate: widget.today,
     );
-    if (receivedDate == null) return;
-    final accepted = await widget.run(
-      () => widget.bridge.markExpectedIncomeReceived(
-        id: income.id,
-        receivedDate: receivedDate,
+    if (receivedDate == null || !mounted) return;
+    final actual = await showDialog<String>(
+      context: context,
+      builder: (_) => _ReceivedAmountDialog(
+        strings: widget.strings,
+        initial: amountInput(income.amount, language: widget.strings.language),
       ),
+    );
+    if (actual == null) return;
+    if (!mounted) return;
+    final accepted = await _receive(
+      income.id,
+      receivedDate,
+      actual,
+      expected: true,
     );
     if (accepted && mounted) {
       if (_editingExpectedIncomeId == income.id) _cancelIncomeEdit();
@@ -1147,37 +1144,31 @@ class _BudgetScreenState extends State<BudgetScreen> {
     }
   }
 
-  Future<void> _pickIncomeDate() async {
-    final picked = await showPouchDatePicker(
-      context: context,
-      bridge: widget.bridge,
-      strings: widget.strings,
-      initialDate: _incomeDate,
-      calendar: widget.snapshot.preferences.calendar,
-      weekStart: widget.snapshot.preferences.weekStart,
-      firstDate: firstPouchRecordDate,
-      lastDate: _lastIncomeDate,
-    );
-    if (picked != null) {
-      final existingIncome = widget.snapshot.income.where(
-        (value) => value.date == picked,
-      );
-      final existingExpected = widget.snapshot.expectedIncome.where(
-        (value) => value.date == picked,
-      );
-      _selectIncomeDate(
-        picked,
-        income: existingIncome.isEmpty ? null : existingIncome.first,
-        expected: existingExpected.isEmpty ? null : existingExpected.first,
-      );
-      setState(() {
-        _salaryMonth = widget.bridge.calendarMonth(
-          picked,
-          widget.snapshot.preferences.calendar,
-          0,
-        );
-      });
+  Future<bool> _receive(
+    String id,
+    String date,
+    String amount, {
+    bool expected = false,
+  }) async {
+    final period = _periodView?.period;
+    if (period == null) {
+      showPouchMessage(context, widget.strings, 'choosePeriodHint');
+      return false;
     }
+    final accepted = await widget.run(
+      () => widget.bridge.receiveIncome(
+        id: id,
+        date: date,
+        amount: amount,
+        periodId: period.id,
+        startNew: false,
+        expected: expected,
+      ),
+    );
+    if (accepted && mounted) {
+      PouchMotion.celebrate(context, anchor: _incomeButton);
+    }
+    return accepted;
   }
 
   Future<void> _pickEffectiveDate() async {
@@ -1185,13 +1176,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
       context: context,
       bridge: widget.bridge,
       strings: widget.strings,
-      initialDate: _effective.compareTo(widget.today) < 0
-          ? widget.today
-          : _effective,
+      initialDate: _effective,
       calendar: widget.snapshot.preferences.calendar,
       weekStart: widget.snapshot.preferences.weekStart,
-      firstDate: widget.today,
-      lastDate: _lastIncomeDate,
+      firstDate: _periodView?.period.start ?? widget.today,
+      lastDate: _periodView?.period.end ?? _lastIncomeDate,
     );
     if (picked != null) setState(() => _effective = picked);
   }
@@ -1203,37 +1192,50 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }) {
     setState(() {
       _incomeDate = date;
-      if (_editingIncomeId != null || _editingExpectedIncomeId != null) {
-        return;
-      }
-      _editingIncomeId = income?.id;
-      _editingExpectedIncomeId = expected?.id;
-      final amount = income?.amount ?? expected?.amount;
-      if (amount == null) {
+      if (_editingIncomeId == null && _editingExpectedIncomeId == null) {
         _incomeAmount.clear();
-      } else {
-        _incomeAmount.text = amountInput(
-          amount,
-          language: widget.strings.language,
-        );
       }
     });
   }
 }
 
-class _ExpenseDraft {
-  _ExpenseDraft(this.id, String name, String amount)
-    : name = TextEditingController(text: name),
-      amount = TextEditingController(text: amount);
+String _newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);
 
-  final String id;
-  final TextEditingController name;
-  final TextEditingController amount;
-
-  void dispose() {
-    name.dispose();
-    amount.dispose();
-  }
+class _ReceivedAmountDialog extends StatefulWidget {
+  const _ReceivedAmountDialog({required this.strings, required this.initial});
+  final AppStrings strings;
+  final String initial;
+  @override
+  State<_ReceivedAmountDialog> createState() => _ReceivedAmountDialogState();
 }
 
-String _newId() => DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+class _ReceivedAmountDialogState extends State<_ReceivedAmountDialog> {
+  late final amount = TextEditingController(text: widget.initial);
+  @override
+  void dispose() {
+    amount.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.strings.text('receivedIncome')),
+    content: TextField(
+      controller: amount,
+      autofocus: true,
+      inputFormatters: [PouchMoneyInputFormatter(widget.strings.language)],
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(labelText: widget.strings.text('amount')),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: Text(widget.strings.text('cancel')),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, amount.text.trim()),
+        child: Text(widget.strings.text('continueIncome')),
+      ),
+    ],
+  );
+}
