@@ -1,0 +1,61 @@
+name: Windows desktop build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout Pouch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout Flutter 3.47.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: flutter/flutter
+          ref: d3b14c876900e553bc736ca19295fc09e3853e8e
+          path: .tooling/flutter
+          fetch-depth: 0
+      - name: Configure build toolchains
+        run: |
+          "$env:GITHUB_WORKSPACE\.tooling\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          if ($LASTEXITCODE -ne 0) { throw "Rust toolchain installation failed." }
+          rustup default 1.97.1
+          if ($LASTEXITCODE -ne 0) { throw "Rust toolchain selection failed." }
+      - name: Validate and package
+        run: ./validate-and-build-windows.ps1
+      - name: Verify version and write checksum
+        run: |
+          $ErrorActionPreference = "Stop"
+          $VersionLine = Get-Content flutter/pubspec.yaml | Where-Object { $_ -match '^version:' }
+          $VersionParts = ($VersionLine -replace '^version:\s*', '').Split('+')
+          $Version = $VersionParts[0]
+          $ExpectedVersion = "$Version.$($VersionParts[1])"
+          $Executable = Get-Item flutter/build/windows/x64/runner/Release/pouch.exe
+          $Info = $Executable.VersionInfo
+          $ActualVersion = "$($Info.FileMajorPart).$($Info.FileMinorPart).$($Info.FileBuildPart).$($Info.FilePrivatePart)"
+          if ($ActualVersion -ne $ExpectedVersion) { throw "Executable version $ActualVersion does not match $ExpectedVersion." }
+          $Archive = Get-Item "dist/pouch-$Version-windows-x64.zip"
+          $Hash = (Get-FileHash -LiteralPath $Archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$Hash  $($Archive.Name)" | Set-Content -Path dist/SHA256SUMS -Encoding ascii
+      - name: Upload Windows bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pouch-windows-x64
+          path: |
+            dist/pouch-*-windows-x64.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14

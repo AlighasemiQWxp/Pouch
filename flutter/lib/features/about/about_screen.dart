@@ -54,7 +54,7 @@ class AboutScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
-                Chip(label: Text('${strings.text('versionLabel')} 2.0.0')),
+                Chip(label: Text('${strings.text('versionLabel')} 3.0.0')),
                 const Chip(label: Text('Android')),
                 const Chip(label: Text('Linux')),
                 const Chip(label: Text('Windows')),

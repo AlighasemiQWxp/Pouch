@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 3.0.0
 
-- Verify the updated application manually on Android and Linux.
+- Set the application and About screen version to 3.0.0 (build 5).
+- Add a Windows CI workflow that validates and packages the portable release.
+- Confirm manual build and application testing on Android and Linux.
 
 - Refresh the README walkthrough with current Android screenshots while preserving the Pouch banner.
 

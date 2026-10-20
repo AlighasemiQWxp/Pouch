@@ -137,9 +137,9 @@ If you change the Rust API, regenerate the Flutter bridge from the flutter direc
 
 Windows x64 and Linux x64 runners, platform services, and manual packaging scripts are prepared. See [desktop build and acceptance instructions](docs/DESKTOP.md). Version 2 packages have passed manual build and runtime validation on Ubuntu 26.04 x64, Android, and Windows 11. Windows is an unsigned portable release. Ubuntu 24.04 compatibility of the published Linux package has not been verified. The Linux workflow runs on every push to main and on pull requests, and can also be started manually. It checks the Flutter frontend and Rust core, builds the Linux application, and uploads an Actions artifact rather than a release. Results appear in GitHub Actions and commit or pull-request checks.
 
-## Version 2
+## Version 3
 
-Version 2.0.0 (Android build 4) packages are validated for Android, Linux x64, and Windows x64. See the [changelog](CHANGELOG.md), [release verification record](docs/RELEASE_V2.md), and [GitHub release](https://github.com/AlighasemiQWxp/Pouch/releases/tag/v2.0.0).
+Version 3.0.0 (build 5) includes the explicit-period budget redesign and refreshed interface. The maintainer confirmed Android and Linux builds and application testing before the release version change. The Windows x64 portable package is built and checked on a GitHub-hosted Windows runner. See the [changelog](CHANGELOG.md), [release verification record](docs/RELEASE_V3.md), and [GitHub release](https://github.com/AlighasemiQWxp/Pouch/releases/tag/v3.0.0).
 
 ## Release signing and validation
 

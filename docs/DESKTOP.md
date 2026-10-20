@@ -65,7 +65,7 @@ For Version 2, manual builds, automated validation and application testing were 
 
 ## Explicit-period redesign validation
 
-The current working-tree redesign has not been compiled, unit-tested, or built here. Earlier Version 2 acceptance records above describe the released version only. Source generation and static checks are not runtime validation.
+The redesign source at commit 1143b30 passed the Linux validation and build workflow, including Rust and Flutter checks and tests. The maintainer also confirmed Android and Linux builds and application testing. Earlier Version 2 acceptance records above describe that release only.
 
 Completed source checks: official bridge generation in source-parsing mode, matching Rust/Dart bridge hashes, Dart static analysis with no issues, Rust/Dart formatting checks, whitespace checks respecting existing CRLF files, and 536 matching English/Persian localization keys with matching placeholders. Rust and Flutter regression tests and platform builds have not been executed.
 
@@ -91,4 +91,10 @@ Acceptance sequence:
 - Exercise report range/specific/week/month selection, category charts, historical unpaid obligations, PDF preview/export, printing and cancellation. Test backup export/restore, recovery export, reset confirmation, restart persistence, process locking, invalid/oversized backups, and incompatible-format archival.
 - Verify English and Persian, LTR/RTL, Gregorian/Jalali, Persian/Arabic numeric input, large text, keyboard dismissal, dialog cancellation, rapid selector changes, Android portrait, and narrow/wide Linux/Windows windows. Check all navigation destinations, focus/hover/disabled states, and short windows.
 
-Regression suites include explicit-period accounting, transactional changes, period forecasts, application navigation/onboarding, localization parity, and responsive components. Rust and Flutter test execution remains pending manual execution.
+Regression suites include explicit-period accounting, transactional changes, period forecasts, application navigation/onboarding, localization parity, and responsive components. Rust and Flutter tests passed in the Linux workflow for commit 1143b30.
+
+## GitHub Actions Windows workflow
+
+.github/workflows/windows-desktop.yml runs on pushes to main, pull requests and manual dispatch. It uses Windows Server 2022 with the same pinned Flutter and Rust toolchains as Linux CI. It runs validate-and-build-windows.ps1, checks the executable version against pubspec.yaml, and uploads the complete portable ZIP and SHA256SUMS as an Actions artifact for 14 days. Repository permissions are read-only; publishing a GitHub Release is a separate step after successful validation.
+
+The maintainer confirmed builds and manual application testing on Android and Linux for the Version 3 source before its release version change. The Windows build is performed by CI. A successful Windows build does not establish interactive UI, printing or Windows 11 runtime acceptance; those checks must be recorded separately. See RELEASE_V3.md for the release scope.
