@@ -32,6 +32,17 @@ pub fn essential(state: &AppState, date: Date) -> PouchResult<i64> {
 }
 
 pub fn reconcile(state: &mut AppState, date: Date) -> PouchResult<()> {
+    let through = state
+        .allocations
+        .iter()
+        .map(|item| item.date)
+        .max()
+        .unwrap_or(date)
+        .max(date);
+    rebuild_from(state, date, through)
+}
+
+fn reconcile_at(state: &mut AppState, date: Date) -> PouchResult<()> {
     let period = match crate::periods::at(state, date) {
         Ok(period) => period,
         Err(crate::PouchError::MissingPeriod) => return Ok(()),
@@ -72,21 +83,24 @@ pub fn reconcile(state: &mut AppState, date: Date) -> PouchResult<()> {
         .iter()
         .filter(|item| {
             item.kind == PlannedKind::Goal
-                && item.status == PlannedStatus::Pending
+                && (item.status == PlannedStatus::Pending
+                    || item.paid_date.is_some_and(|paid| paid > date))
                 && crate::periods::context::planned_matches(state, item, &period.id)
         })
         .collect();
     goals.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
     for goal in goals {
         cumulative = total(cumulative, goal.amount.hundredths())?;
-        let days = i64::from(date.days_until(goal.date).saturating_add(1)).max(1);
-        let remaining_days = i64::from(date.days_until(period.end));
-        let needed = (cumulative - current).max(0);
-        let contribution = (i128::from(needed) * i128::from(remaining_days) + i128::from(days) - 1)
+        let days = i64::from(period.start.days_until(goal.date).saturating_add(1)).max(1);
+        let period_days = i64::from(period.start.days_until(period.end));
+        let opening_remaining = (opening - payments).max(0);
+        let needed = (cumulative - opening_remaining).max(0);
+        let contribution = (i128::from(needed) * i128::from(period_days) + i128::from(days) - 1)
             / i128::from(days);
         let contribution = i64::try_from(contribution.min(i128::from(needed)))
             .map_err(|_| crate::PouchError::TotalTooLarge)?;
-        target = target.max(total(current, contribution)?);
+        let required = total(contribution, (payments - opening).max(0))?;
+        target = target.max(total(current, (required - contributed).max(0))?);
     }
     let adjustment = target.min(available) - raw;
     if adjustment != 0 {
@@ -110,7 +124,7 @@ pub(crate) fn rebuild_from(state: &mut AppState, from: Date, through: Date) -> P
         .allocations
         .retain(|item| item.date < from || item.date > through);
     for date in dates.range(from..=through) {
-        reconcile(state, *date)?;
+        reconcile_at(state, *date)?;
     }
     Ok(())
 }

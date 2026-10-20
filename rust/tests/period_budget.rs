@@ -742,3 +742,209 @@ fn assigned_future_expenses_and_goals_use_the_chosen_period() {
     assert!(names.values().all(|name| name.starts_with("P-")));
     state.validate().unwrap();
 }
+
+#[test]
+fn long_term_goal_contribution_is_not_repeated_on_later_days() {
+    let mut state = state();
+    receive(&mut state, "salary", "2024-10-10", 10_000);
+    expenses::save_planned(
+        &mut state,
+        expenses::create_planned(
+            "goal".into(),
+            "Long term goal".into(),
+            money(6200),
+            Category::Other,
+            PlannedKind::Goal,
+            day("2024-12-10"),
+        ),
+    )
+    .unwrap();
+    for offset in 0..31 {
+        let date = day("2024-10-10").add_days(offset).unwrap();
+        savings::reconcile(&mut state, date).unwrap();
+        assert_eq!(savings::balance(&state, date).unwrap(), 3100);
+        let before = state.clone();
+        savings::reconcile(&mut state, date).unwrap();
+        assert_eq!(state, before);
+    }
+    assert_eq!(state.allocations.len(), 1);
+    assert!(
+        budget::recommend(&state, day("2024-10-21"))
+            .unwrap()
+            .recommendation
+            > 0
+    );
+}
+
+#[test]
+fn minimum_savings_and_goal_share_one_period_contribution() {
+    let mut state = state();
+    receive(&mut state, "salary", "2024-10-10", 10_000);
+    expenses::save_planned(
+        &mut state,
+        expenses::create_planned(
+            "goal".into(),
+            "Long term goal".into(),
+            money(6200),
+            Category::Other,
+            PlannedKind::Goal,
+            day("2024-12-10"),
+        ),
+    )
+    .unwrap();
+    savings::reconcile(&mut state, day("2024-10-10")).unwrap();
+    budget::save_plan(
+        &mut state,
+        BudgetPlan {
+            period_id: "BP-001".into(),
+            effective: day("2024-10-12"),
+            savings: money(4000),
+        },
+    )
+    .unwrap();
+    for offset in 3..10 {
+        pouch_core::purchases::add(
+            &mut state,
+            format!("purchase-{offset}"),
+            day("2024-10-10").add_days(offset).unwrap(),
+            "Food".into(),
+            money(50),
+            Category::Food,
+        )
+        .unwrap();
+    }
+    let summary = budget::recommend(&state, day("2024-10-19")).unwrap();
+    assert_eq!(summary.savings, 4000);
+    assert_eq!(summary.remaining, 5650);
+    assert_eq!(summary.recommendation, 209);
+    assert_eq!(
+        budget::recommend(&state, day("2024-10-20"))
+            .unwrap()
+            .recommendation,
+        269
+    );
+}
+
+#[test]
+fn rollover_credits_opening_savings_before_funding_the_next_period() {
+    let mut state = state();
+    receive(&mut state, "salary", "2024-10-10", 10_000);
+    expenses::save_planned(
+        &mut state,
+        expenses::create_planned(
+            "goal".into(),
+            "Long term goal".into(),
+            money(6200),
+            Category::Other,
+            PlannedKind::Goal,
+            day("2024-12-10"),
+        ),
+    )
+    .unwrap();
+    savings::reconcile(&mut state, day("2024-10-10")).unwrap();
+    periods::create(
+        &mut state,
+        day("2024-11-10"),
+        day("2024-12-11"),
+        Recurrence::Monthly,
+        Calendar::Gregorian,
+    )
+    .unwrap();
+    for offset in 0..31 {
+        let date = day("2024-11-10").add_days(offset).unwrap();
+        savings::reconcile(&mut state, date).unwrap();
+        assert_eq!(savings::balance(&state, date).unwrap(), 6200);
+        assert_eq!(budget::funding(&state, date).unwrap().free, 3800);
+    }
+    assert_eq!(state.income.len(), 1);
+}
+
+#[test]
+fn paying_a_goal_does_not_repeat_the_remaining_goals_contribution() {
+    let mut state = state();
+    receive(&mut state, "salary", "2024-10-10", 10_000);
+    for (id, amount, due) in [("near", 1000, "2024-10-10"), ("later", 6200, "2024-12-10")] {
+        expenses::save_planned(
+            &mut state,
+            expenses::create_planned(
+                id.into(),
+                id.into(),
+                money(amount),
+                Category::Other,
+                PlannedKind::Goal,
+                day(due),
+            ),
+        )
+        .unwrap();
+    }
+    savings::reconcile(&mut state, day("2024-10-10")).unwrap();
+    expenses::mark_paid(
+        &mut state,
+        "near",
+        "payment".into(),
+        day("2024-10-11"),
+        money(1000),
+    )
+    .unwrap();
+    for offset in 1..10 {
+        let date = day("2024-10-10").add_days(offset).unwrap();
+        savings::reconcile(&mut state, date).unwrap();
+        let funding = budget::funding(&state, date).unwrap();
+        assert_eq!(funding.savings, 3100);
+        assert_eq!(funding.free, 5900);
+        assert_eq!(
+            funding.cash,
+            funding.free + funding.reserved + funding.savings
+        );
+    }
+}
+
+#[test]
+fn goal_reservation_recovers_after_cash_shortage_without_accumulating_again() {
+    let mut state = state();
+    receive(&mut state, "salary", "2024-10-10", 1000);
+    expenses::save_planned(
+        &mut state,
+        expenses::create_planned(
+            "goal".into(),
+            "Goal".into(),
+            money(6200),
+            Category::Other,
+            PlannedKind::Goal,
+            day("2024-12-10"),
+        ),
+    )
+    .unwrap();
+    savings::reconcile(&mut state, day("2024-10-10")).unwrap();
+    assert_eq!(savings::balance(&state, day("2024-10-10")).unwrap(), 1000);
+    receive(&mut state, "extra", "2024-10-11", 9000);
+    for offset in 1..10 {
+        let date = day("2024-10-10").add_days(offset).unwrap();
+        savings::reconcile(&mut state, date).unwrap();
+        assert_eq!(savings::balance(&state, date).unwrap(), 3100);
+    }
+}
+
+#[test]
+fn backdated_income_correction_replays_later_savings_instead_of_duplicating_them() {
+    let mut state = state();
+    receive(&mut state, "salary", "2024-10-10", 1000);
+    budget::save_plan(
+        &mut state,
+        BudgetPlan {
+            period_id: "BP-001".into(),
+            effective: day("2024-10-10"),
+            savings: money(4000),
+        },
+    )
+    .unwrap();
+    receive(&mut state, "later", "2024-10-12", 9000);
+    assert_eq!(savings::balance(&state, day("2024-10-12")).unwrap(), 4000);
+    income::edit(&mut state, "salary", day("2024-10-10"), money(5000)).unwrap();
+    assert_eq!(savings::balance(&state, day("2024-10-10")).unwrap(), 4000);
+    assert_eq!(savings::balance(&state, day("2024-10-12")).unwrap(), 4000);
+    assert_eq!(
+        budget::funding(&state, day("2024-10-12")).unwrap().free,
+        10_000
+    );
+}

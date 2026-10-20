@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{AppState, PouchError, PouchResult};
 const MAGIC: &[u8; 8] = b"POUCHDAT";
-const FILE_FORMAT_VERSION: u16 = 4;
+const FILE_FORMAT_VERSION: u16 = 5;
 const HEADER_LENGTH: usize = 18;
 const MAX_FILE_LENGTH: usize = 5_000_000;
 
@@ -66,7 +66,7 @@ impl BinaryStore {
                     return Ok(Some(LoadedState {
                         state,
                         recovered: false,
-                        upgraded: bytes[8..10] == 3u16.to_le_bytes(),
+                        upgraded: bytes[8..10] != FILE_FORMAT_VERSION.to_le_bytes(),
                     }));
                 }
                 Err(PouchError::UnsupportedStorageVersion) => {
@@ -83,7 +83,7 @@ impl BinaryStore {
                     return Ok(Some(LoadedState {
                         state,
                         recovered: true,
-                        upgraded: bytes[8..10] == 3u16.to_le_bytes(),
+                        upgraded: bytes[8..10] != FILE_FORMAT_VERSION.to_le_bytes(),
                     }));
                 }
                 Err(PouchError::UnsupportedStorageVersion) => {
@@ -173,7 +173,7 @@ fn decode(bytes: &[u8]) -> PouchResult<AppState> {
             .try_into()
             .map_err(|_| PouchError::CorruptStorage)?,
     );
-    if format_version != FILE_FORMAT_VERSION && format_version != 3 {
+    if !matches!(format_version, 3 | 4 | FILE_FORMAT_VERSION) {
         return Err(PouchError::UnsupportedStorageVersion);
     }
     let payload_length = u32::from_le_bytes(
@@ -215,12 +215,24 @@ fn decode(bytes: &[u8]) -> PouchResult<AppState> {
             .upgrade()
             .map_err(|_| PouchError::CorruptStorage);
     }
-    if stored_schema_version != AppState::CURRENT_SCHEMA_VERSION {
+    let expected_schema = if format_version == 4 {
+        6
+    } else {
+        AppState::CURRENT_SCHEMA_VERSION
+    };
+    if stored_schema_version != expected_schema {
         return Err(PouchError::UnsupportedStorageVersion);
     }
     let envelope: StorageEnvelope =
         postcard::from_bytes(payload).map_err(|_| PouchError::CorruptStorage)?;
     let state = envelope.state;
+    if state.schema_version != expected_schema {
+        return Err(PouchError::CorruptStorage);
+    }
+    if format_version == 4 {
+        return super::previous_schema::repair_savings(state)
+            .map_err(|_| PouchError::CorruptStorage);
+    }
     state.validate().map_err(|_| PouchError::CorruptStorage)?;
     Ok(state)
 }

@@ -50,22 +50,34 @@ impl PreviousState {
         };
         state.validate()?;
         crate::periods::context::synchronize(&mut state);
-        Ok(state)
+        repair_savings(state)
     }
 }
 
-pub(crate) fn upgrade_json(mut state: serde_json::Value) -> PouchResult<AppState> {
-    if state.get("schemaVersion").and_then(|value| value.as_u64()) != Some(5) {
+pub(crate) fn upgrade_json(mut state: serde_json::Value, schema: u64) -> PouchResult<AppState> {
+    if state.get("schemaVersion").and_then(|value| value.as_u64()) != Some(schema) {
         return Err(PouchError::InvalidBackup);
     }
     state["schemaVersion"] = AppState::CURRENT_SCHEMA_VERSION.into();
-    state
-        .as_object_mut()
-        .ok_or(PouchError::InvalidBackup)?
-        .remove("periodContext");
+    if schema == 5 {
+        state
+            .as_object_mut()
+            .ok_or(PouchError::InvalidBackup)?
+            .remove("periodContext");
+    }
     let mut state: AppState =
         serde_json::from_value(state).map_err(|_| PouchError::InvalidBackup)?;
     state.validate().map_err(|_| PouchError::InvalidBackup)?;
     crate::periods::context::synchronize(&mut state);
+    repair_savings(state).map_err(|_| PouchError::InvalidBackup)
+}
+
+pub(crate) fn repair_savings(mut state: AppState) -> PouchResult<AppState> {
+    state.schema_version = AppState::CURRENT_SCHEMA_VERSION;
+    state.validate()?;
+    let today = Date::from_naive_date(chrono::Local::now().date_naive())?;
+    let start = state.start_date;
+    crate::savings::rebuild_from(&mut state, start, today)?;
+    state.validate()?;
     Ok(state)
 }

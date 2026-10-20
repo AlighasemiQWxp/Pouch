@@ -1,28 +1,36 @@
 # Pouch 3.0.0 release record
 
-## Scope
+## Build 6 savings correction
 
-The maintained application uses Flutter and the Rust core. Version 3.0.0 (build 5) updates the application metadata and About screen. The release includes explicit editable budget periods, income-calendar entry, period selectors, savings and plan controls, refreshed navigation and responsive interface, and offline English/Persian reports. See CHANGELOG.md for the full source changes.
+The maintained Flutter application and Rust core retain version 3.0.0 and increase the build number from 5 to 6. The correction credits existing period contributions when reserving money for savings goals, preventing repeated reservations from consuming the daily spending budget. Backdated corrections replay later allocations. Previous binary formats and JSON backup versions 8 and 9 receive a one-time repair of derived allocations, preserving ledger entries and keeping the original binary recovery copy. See [data formats](DATA_FORMAT.md) for repair scope and compatibility.
 
 The legacy root-level WebView application is outside this release.
 
 ## Validation
 
-The [Linux validation and build workflow](https://github.com/AlighasemiQWxp/Pouch/actions/runs/39310734644) passed for source commit 1143b30b99dd1203259c96f19a96ca10a8a25587, including formatting, linting, Rust and Flutter tests, and Linux packaging.
+The maintainer ran the Linux validation/build script successfully: Rust formatting, Clippy, 112 Rust tests, locked Flutter dependency resolution, Dart formatting, Flutter analysis, 50 Flutter tests, and Linux release packaging passed. The maintainer also built the signed Android release and confirmed that the corrected Version 3 application works.
 
-The maintainer confirmed Linux and Android builds and manual application testing for the current application source before the release metadata changed from 2.0.0+4 to 3.0.0+5. That confirmation does not claim the previously built packages contain the new version metadata.
+The Android APK reports package com.daybook.app, version 3.0.0, and build 6, and passes APK signature verification. The locally validated Linux archive has SHA-256 9784b8e8e539899d1d2d0d123c49047ec6743a7ae974244342407ae357907fb1. The signed Android APK has SHA-256 700d06c8d79d363f51abbdde643ae1b3aafb218978485b8236611e9acd6e51ab.
 
-The Windows workflow runs Rust formatting, Clippy and tests, locked Flutter dependency resolution, Dart formatting, Flutter analysis and tests, and the Windows release build. It checks required bundle files and verifies the executable's numeric resource version matches pubspec.yaml. Release publication requires a successful run for the tagged source commit and verified artifact checksums.
+Windows and Linux GitHub Actions validate and package the reviewed correction commit. Windows CI verifies the executable version against 3.0.0+6. Interactive testing of the Windows package is not performed by CI. The published Linux package is built on Ubuntu 24.04 in CI; the local Linux validation above is separate evidence.
 
-Windows interactive runtime testing is not performed by CI. Earlier Windows 11 acceptance records describe Version 2 and are not Version 3 runtime evidence.
+## Replacement publication
 
-## Assets and publication
+The existing [Version 3 release](https://github.com/AlighasemiQWxp/Pouch/releases/tag/v3.0.0) is the publication location for all three corrected packages:
 
-- pouch-3.0.0-windows-x64.zip: the complete unsigned portable Windows application, including the Rust DLL, Flutter runtime, plugins, assets and license notices.
-- SHA256SUMS: SHA-256 checksum of the published Windows ZIP.
+- pouch-3.0.0-android.apk
+- pouch-3.0.0-linux-x64.tar.gz
+- pouch-3.0.0-windows-x64.zip
+- SHA256SUMS
 
-Extract the entire ZIP and run pouch.exe. Windows requires the compatible Microsoft Visual C++ runtime. This package is not an installer and is not Authenticode signed.
+The original source tag v3.0.0 remains at 69d94745d5a8295ac7dec17be8a4264e7bd669cd. The release notes identify the exact correction commit and successful Windows/Linux CI runs for the replacement build 6 packages. The automatic source archives attached to the original tag still represent build 5; use the correction commit linked in the release notes for build 6 source.
 
-This release publishes the Windows package requested by the maintainer. Previously built Android and Linux packages are not renamed or represented as newly built 3.0.0 packages.
+All replacement packages must be verified before upload. SHA256SUMS covers the three published application packages. Publication verification downloads the replacement assets and compares their hashes with the prepared packages. The release notes provide the final source and CI evidence, avoiding a moving tag or rewritten history.
 
-Publish tag v3.0.0 at the reviewed source commit after validation and successful CI. Verify the downloaded release assets against SHA256SUMS and confirm the tag, local main and remote main identify the same commit. Build logs are available under the repository's Windows desktop build workflow in GitHub Actions.
+## Original release validation
+
+The original release notes report successful Windows and Linux CI builds and a maintainer-built, signed Android APK with version 3.0.0/build 5. The [Linux release workflow](https://github.com/AlighasemiQWxp/Pouch/actions/runs/39499628065) built the Linux package from the original tagged source. Earlier maintainer Android/Linux runtime checks preceded the version metadata update and do not validate build 6. Windows interactive runtime testing was not performed by CI.
+
+## Platform notes
+
+Extract the complete Windows ZIP and run pouch.exe, retaining its DLLs and data directory. It is an unsigned portable application, not an installer, and requires a compatible Microsoft Visual C++ runtime. Extract the complete Linux archive and run ./pouch; compatible glibc, GTK 3, and graphics libraries are required. The Android package must retain the existing application ID and signing certificate to support an in-place update.

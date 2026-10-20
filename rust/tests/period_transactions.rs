@@ -519,3 +519,242 @@ fn period_deletion_preserves_linked_savings_purchases_and_targets() {
         assert_eq!(state, before, "{kind}");
     }
 }
+
+fn inflated_savings_state() -> AppState {
+    use pouch_core::{budget, expenses, income, models::*, purchases};
+
+    let mut state = AppState::fresh(date("2024-01-01"));
+    let period_id = periods::create(
+        &mut state,
+        date("2024-01-01"),
+        date("2024-02-01"),
+        Recurrence::Monthly,
+        Calendar::Gregorian,
+    )
+    .unwrap();
+    income::receive(
+        &mut state,
+        "salary".into(),
+        date("2024-01-01"),
+        Money::from_hundredths(100_000).unwrap(),
+        Some(&period_id),
+        None,
+        false,
+    )
+    .unwrap();
+    expenses::save_planned(
+        &mut state,
+        expenses::create_planned(
+            "goal".into(),
+            "Long term goal".into(),
+            Money::from_hundredths(62_000).unwrap(),
+            Category::Other,
+            PlannedKind::Goal,
+            date("2024-03-02"),
+        ),
+    )
+    .unwrap();
+    periods::context::assign_planned(&mut state, "goal", &period_id).unwrap();
+    budget::save_plan(
+        &mut state,
+        BudgetPlan {
+            period_id: period_id.clone(),
+            effective: date("2024-01-04"),
+            savings: Money::from_hundredths(40_000).unwrap(),
+        },
+    )
+    .unwrap();
+    purchases::add(
+        &mut state,
+        "purchase".into(),
+        date("2024-01-05"),
+        "Food".into(),
+        Money::from_hundredths(500).unwrap(),
+        Category::Food,
+    )
+    .unwrap();
+    state.allocations = [
+        ("2024-01-01", 60_000),
+        ("2024-01-02", 40_000),
+        ("2024-01-05", -500),
+    ]
+    .into_iter()
+    .map(|(day, amount)| SavingsAllocation {
+        period_id: period_id.clone(),
+        date: date(day),
+        amount,
+    })
+    .collect();
+    state.validate().unwrap();
+    state
+}
+
+fn previous_binary(state: &AppState) -> Vec<u8> {
+    let mut previous = state.clone();
+    previous.schema_version = 6;
+    let payload = postcard::to_allocvec(&(6u16, previous)).unwrap();
+    let mut bytes = b"POUCHDAT".to_vec();
+    bytes.extend_from_slice(&4u16.to_le_bytes());
+    bytes.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    bytes.extend_from_slice(&crc32fast::hash(&payload).to_le_bytes());
+    bytes.extend_from_slice(&payload);
+    bytes
+}
+
+fn assert_repaired_savings(original: &AppState, repaired: &AppState) {
+    let mut ledger = serde_json::to_value(original).unwrap();
+    ledger["schemaVersion"] = AppState::CURRENT_SCHEMA_VERSION.into();
+    ledger["allocations"] = serde_json::to_value(&repaired.allocations).unwrap();
+    assert_eq!(ledger, serde_json::to_value(repaired).unwrap());
+    let summary = pouch_core::budget::recommend(repaired, date("2024-01-05")).unwrap();
+    assert_eq!(summary.savings, 40_000);
+    assert_eq!(summary.remaining, 59_500);
+    assert_eq!(summary.recommendation, 1722);
+    assert_eq!(
+        pouch_core::budget::recommend(repaired, date("2024-01-06"))
+            .unwrap()
+            .recommendation,
+        2288
+    );
+}
+
+#[test]
+fn version_nine_backup_repairs_savings_and_keeps_every_ledger_record() {
+    let original = inflated_savings_state();
+    let mut previous = original.clone();
+    previous.schema_version = 6;
+    let contents = serde_json::json!({"version": 9, "state": previous}).to_string();
+    let repaired = backup::import_json(&contents).unwrap();
+    assert_repaired_savings(&original, &repaired);
+    let current = backup::export_json(&repaired).unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&current).unwrap()["version"],
+        10
+    );
+    assert_eq!(backup::import_json(&current).unwrap(), repaired);
+    let dir = tempfile::tempdir().unwrap();
+    let mut core = PouchCore::open(dir.path(), &[]).unwrap();
+    core.replace_state(repaired.clone()).unwrap();
+    assert_eq!(PouchCore::open(dir.path(), &[]).unwrap().state(), &repaired);
+    core.apply_reversible(|state| {
+        pouch_core::purchases::remove(state, date("2024-01-05"), "purchase")
+    })
+    .unwrap();
+    assert!(core.undo().unwrap());
+    assert_eq!(core.state(), &repaired);
+    assert_eq!(PouchCore::open(dir.path(), &[]).unwrap().state(), &repaired);
+}
+
+#[test]
+fn version_four_binary_repairs_once_and_preserves_original_recovery_bytes() {
+    let original = inflated_savings_state();
+    let previous = previous_binary(&original);
+    let dir = tempfile::tempdir().unwrap();
+    let primary = dir.path().join("pouch.data");
+    let recovery = dir.path().join("pouch.data.backup");
+    std::fs::write(&primary, &previous).unwrap();
+    let core = PouchCore::open(dir.path(), &[]).unwrap();
+    assert_repaired_savings(&original, core.state());
+    assert_eq!(std::fs::read(&recovery).unwrap(), previous);
+    let upgraded = std::fs::read(&primary).unwrap();
+    let reopened = PouchCore::open(dir.path(), &[]).unwrap();
+    assert_eq!(core.state(), reopened.state());
+    assert_eq!(std::fs::read(&primary).unwrap(), upgraded);
+    assert_eq!(std::fs::read(&recovery).unwrap(), previous);
+}
+
+#[test]
+fn corrupt_primary_can_recover_and_repair_previous_savings_data() {
+    let original = inflated_savings_state();
+    let previous = previous_binary(&original);
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("pouch.data"), b"incomplete").unwrap();
+    std::fs::write(dir.path().join("pouch.data.backup"), &previous).unwrap();
+    let core = PouchCore::open(dir.path(), &[]).unwrap();
+    assert!(core.was_recovered());
+    assert_repaired_savings(&original, core.state());
+    assert_eq!(
+        std::fs::read(dir.path().join("pouch.data.backup")).unwrap(),
+        previous
+    );
+}
+
+#[test]
+fn backup_versions_require_the_matching_state_schema() {
+    let original = inflated_savings_state();
+    for (version, schema) in [(8, 6), (9, 7), (10, 6), (11, 7)] {
+        let mut state = original.clone();
+        state.schema_version = schema;
+        let contents = serde_json::json!({"version": version, "state": state}).to_string();
+        assert!(backup::import_json(&contents).is_err());
+    }
+}
+
+#[test]
+fn version_eight_backup_also_repairs_inflated_savings() {
+    let original = inflated_savings_state();
+    let mut previous = serde_json::to_value(&original).unwrap();
+    previous["schemaVersion"] = 5.into();
+    previous.as_object_mut().unwrap().remove("periodContext");
+    let contents = serde_json::json!({"version": 8, "state": previous}).to_string();
+    let repaired = backup::import_json(&contents).unwrap();
+    let mut expected = original.clone();
+    expected.period_context = repaired.period_context.clone();
+    assert_repaired_savings(&expected, &repaired);
+    assert_eq!(repaired.period_context.names.len(), 1);
+}
+
+#[test]
+fn repair_keeps_goal_payments_and_their_historical_funding() {
+    use pouch_core::{budget, expenses, models::*, savings};
+
+    let mut original = inflated_savings_state();
+    original.allocations.clear();
+    original.plans.clear();
+    original.planned[0].date = date("2024-01-10");
+    savings::reconcile(&mut original, date("2024-01-01")).unwrap();
+    expenses::mark_paid(
+        &mut original,
+        "goal",
+        "goal-payment".into(),
+        date("2024-01-10"),
+        Money::from_hundredths(62_000).unwrap(),
+    )
+    .unwrap();
+    let mut previous = original.clone();
+    previous.schema_version = 6;
+    let contents = serde_json::json!({"version": 9, "state": previous}).to_string();
+    let repaired = backup::import_json(&contents).unwrap();
+    assert_eq!(repaired.days, original.days);
+    assert_eq!(repaired.planned, original.planned);
+    assert_eq!(repaired.planned[0].status, PlannedStatus::Paid);
+    assert_eq!(
+        budget::recommend(&repaired, date("2024-01-09"))
+            .unwrap()
+            .savings,
+        62_000
+    );
+    let after = budget::funding(&repaired, date("2024-01-10")).unwrap();
+    assert_eq!(after.savings, 0);
+    assert_eq!(after.cash, 37_500);
+    assert_eq!(after.free, 37_500);
+}
+
+#[test]
+fn invalid_old_backup_does_not_replace_existing_application_data() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app =
+        pouch_core::api::PouchApp::open(dir.path().to_string_lossy().into(), vec![]).unwrap();
+    let before = app.export_backup().unwrap();
+    let primary = std::fs::read(dir.path().join("pouch.data")).unwrap();
+    let mut previous = serde_json::to_value(inflated_savings_state()).unwrap();
+    previous["schemaVersion"] = 6.into();
+    previous["allocations"][0]["periodId"] = "missing".into();
+    let contents = serde_json::json!({"version": 9, "state": previous}).to_string();
+    assert!(app.import_backup(contents).is_err());
+    assert_eq!(app.export_backup().unwrap(), before);
+    assert_eq!(
+        std::fs::read(dir.path().join("pouch.data")).unwrap(),
+        primary
+    );
+}

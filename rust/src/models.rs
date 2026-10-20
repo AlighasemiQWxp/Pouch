@@ -315,7 +315,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub const CURRENT_SCHEMA_VERSION: u16 = 6;
+    pub const CURRENT_SCHEMA_VERSION: u16 = 7;
 
     pub fn fresh(start_date: Date) -> Self {
         let preferences = Preferences::default();

@@ -12,10 +12,11 @@ pub fn from_versioned_json(contents: &str) -> PouchResult<AppState> {
         .get("state")
         .ok_or(PouchError::InvalidBackup)?
         .clone();
-    if version == Some(8) {
-        return crate::storage::previous_schema::upgrade_json(value);
+    if version == Some(8) || version == Some(9) {
+        let schema = if version == Some(8) { 5 } else { 6 };
+        return crate::storage::previous_schema::upgrade_json(value, schema);
     }
-    if version != Some(9) {
+    if version != Some(10) {
         return Err(PouchError::UnsupportedBackupVersion);
     }
     let state: AppState = serde_json::from_value(value).map_err(|_| PouchError::InvalidBackup)?;

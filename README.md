@@ -109,7 +109,7 @@ Country selection supplies regional defaults. Calendar and week start can be adj
 
 Pouch keeps budgeting data on the device. Its recommendations are calculations from recorded income and expenses, not a bank balance or a promise of future income.
 
-Explicit periods retain stable IDs and their original planning calendar; changing the display calendar does not move saved dates. Shared boundaries and plan references are validated transactionally. Only received income funds recommendations. Cash and deficits carry forward without creating synthetic income. Pending expenses are reserved before savings; essential bills are included in that reservation once. Savings allocations are recorded, and goal payments consume them. Expected income remains separate until received, including when its actual date or amount differs. Financial forecasts are read-only estimates. See [data formats](docs/DATA_FORMAT.md) for the intentional storage break and [architecture](ARCHITECTURE.md) for the accounting rules.
+Explicit periods retain stable IDs and their original planning calendar; changing the display calendar does not move saved dates. Shared boundaries and plan references are validated transactionally. Only received income funds recommendations. Cash and deficits carry forward without creating synthetic income. Pending expenses are reserved before savings; essential bills are included in that reservation once. Savings allocations are recorded, goal contributions are credited once per period, and goal payments consume them. Backdated corrections replay affected later allocations. Expected income remains separate until received, including when its actual date or amount differs. Financial forecasts are read-only estimates. See [data formats](docs/DATA_FORMAT.md) for the intentional storage break and [architecture](ARCHITECTURE.md) for the accounting rules.
 
 Today shows the spending recommendation, expense entry, and relevant planned expenses. Expense history opens only when requested, with name search and date filtering for paid and planned expenses.
 
@@ -139,7 +139,7 @@ Windows x64 and Linux x64 runners, platform services, and manual packaging scrip
 
 ## Version 3
 
-Version 3.0.0 (build 5) includes the explicit-period budget redesign and refreshed interface. The maintainer confirmed Android and Linux builds and application testing before the release version change. The Windows x64 portable package is built and checked on a GitHub-hosted Windows runner. See the [changelog](CHANGELOG.md), [release verification record](docs/RELEASE_V3.md), and [GitHub release](https://github.com/AlighasemiQWxp/Pouch/releases/tag/v3.0.0).
+Version 3.0.0 build 6 corrects repeated goal reservations that could leave Today with no daily allowance. It repairs derived savings allocations when opening earlier Flutter/Rust data or importing supported backups. The maintainer completed Linux validation, built the signed Android package, and confirmed the corrected application works. The Version 3 release notes identify the replacement package source commit, platform CI results, and checksums. See the [changelog](CHANGELOG.md), [release verification record](docs/RELEASE_V3.md), and [GitHub release](https://github.com/AlighasemiQWxp/Pouch/releases/tag/v3.0.0).
 
 ## Release signing and validation
 

@@ -2,6 +2,16 @@
 
 ## 3.0.0
 
+### Build 6 savings correction
+
+- Stop repeated daily goal contributions from consuming the entire spending budget.
+- Credit opening savings and goal payments, and replay later allocations after backdated corrections.
+- Repair derived allocations once when opening previous binary data or importing version 8/9 backups, preserving financial entries and the original binary recovery copy.
+- Add regression coverage for repeated reconciliation, minimum savings, rollover, payments, historical corrections, backup import, recovery, and undo.
+- Retain version 3.0.0 and increase the application build number to 6. Maintainer validation passed: 112 Rust tests, 50 Flutter tests, formatting, linting, Linux packaging, signed Android packaging, and application testing. Platform CI and package checksums are recorded in the Version 3 release notes.
+
+### Original build 5
+
 - Set the application and About screen version to 3.0.0 (build 5).
 - Add a Windows CI workflow that validates and packages the portable release.
 - Confirm manual build and application testing on Android and Linux.
