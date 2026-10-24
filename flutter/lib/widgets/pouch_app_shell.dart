@@ -4,13 +4,23 @@ import '../core/app_strings.dart';
 import '../core/pouch_theme.dart';
 import 'pouch_coin.dart';
 
-enum AppPage { today, budget, planned, forecast, reports, preferences, about }
+enum AppPage {
+  today,
+  budget,
+  planned,
+  forecast,
+  dashboard,
+  reports,
+  preferences,
+  about,
+}
 
 String pageLabel(AppPage page) => switch (page) {
   AppPage.today => 'navToday',
   AppPage.budget => 'navBudget',
   AppPage.planned => 'plansTitle',
   AppPage.forecast => 'forecastTitle',
+  AppPage.dashboard => 'dashboardTitle',
   AppPage.reports => 'navReports',
   AppPage.preferences => 'navPreferences',
   AppPage.about => 'navAbout',
@@ -20,6 +30,7 @@ IconData pageIcon(AppPage page) => switch (page) {
   AppPage.budget => Icons.account_balance_wallet_outlined,
   AppPage.planned => Icons.event_note_outlined,
   AppPage.forecast => Icons.insights_outlined,
+  AppPage.dashboard => Icons.donut_large_rounded,
   AppPage.reports => Icons.bar_chart_outlined,
   AppPage.preferences => Icons.tune_outlined,
   AppPage.about => Icons.info_outline,
@@ -253,6 +264,7 @@ class PouchAppShell extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final item in [
+              AppPage.dashboard,
               AppPage.forecast,
               AppPage.reports,
               AppPage.preferences,

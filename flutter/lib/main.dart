@@ -15,6 +15,7 @@ import 'features/planned/planned_screen.dart';
 import 'features/forecast/financial_forecast_screen.dart';
 import 'features/preferences/preferences_screen.dart';
 import 'features/reports/reports_screen.dart';
+import 'features/dashboard/dashboard_screen.dart';
 import 'features/today/today_screen.dart';
 import 'widgets/pouch_app_shell.dart';
 import 'widgets/pouch_motion.dart';
@@ -282,6 +283,16 @@ class _PouchApplicationState extends State<PouchApplication>
           today: _today,
           run: _run,
           onOpenPlanned: () => _selectPage(AppPage.planned),
+        );
+      case AppPage.dashboard:
+        return DashboardScreen(
+          bridge: widget.bridge,
+          snapshot: _snapshot,
+          strings: _strings,
+          today: _today,
+          onOpenToday: () => _selectPage(AppPage.today),
+          onOpenBudget: () => _selectPage(AppPage.budget),
+          onOpenPlans: () => _selectPage(AppPage.planned),
         );
       case AppPage.reports:
         return ReportsScreen(

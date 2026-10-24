@@ -64,6 +64,8 @@ abstract class PouchApp implements RustOpaqueInterface {
     String? exchangeRate,
   });
 
+  Future<String> dashboard({required String query});
+
   Future<DatePartsSnapshot> dateParts({
     required String date,
     required String calendar,

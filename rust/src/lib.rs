@@ -3,6 +3,7 @@ pub mod backup;
 pub mod budget;
 pub mod calendar;
 pub mod core;
+pub mod dashboard;
 pub mod economics;
 pub mod error;
 pub mod expenses;

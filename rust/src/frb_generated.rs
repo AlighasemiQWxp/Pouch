@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1701825128;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2097936664;
 
 // Section: executor
 
@@ -388,6 +388,56 @@ fn wire__crate__api__PouchApp_customize_economic_profile_impl(
                         api_daily_spending,
                         api_exchange_rate,
                     )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__PouchApp_dashboard_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "PouchApp_dashboard",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PouchApp>,
+            >>::sse_decode(&mut deserializer);
+            let api_query = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::PouchApp::dashboard(&*api_that_guard, api_query)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -3332,75 +3382,76 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        7 => wire__crate__api__PouchApp_date_parts_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__PouchApp_edit_purchase_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__PouchApp_export_backup_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__PouchApp_export_recovery_backup_impl(
+        7 => wire__crate__api__PouchApp_dashboard_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__PouchApp_date_parts_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__PouchApp_edit_purchase_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__PouchApp_export_backup_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__PouchApp_export_recovery_backup_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__PouchApp_financial_forecast_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__PouchApp_goal_forecast_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__PouchApp_import_backup_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__PouchApp_mark_planned_paid_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__PouchApp_open_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__PouchApp_period_view_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__PouchApp_receive_income_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__PouchApp_remove_budget_plan_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__PouchApp_remove_expected_income_impl(
+        12 => wire__crate__api__PouchApp_financial_forecast_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__PouchApp_goal_forecast_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__PouchApp_import_backup_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__PouchApp_mark_planned_paid_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__PouchApp_open_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__PouchApp_period_view_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__PouchApp_receive_income_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__PouchApp_remove_budget_plan_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__PouchApp_remove_expected_income_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        20 => wire__crate__api__PouchApp_remove_income_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__PouchApp_remove_period_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__PouchApp_remove_planned_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__PouchApp_remove_purchase_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__PouchApp_report_month_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__PouchApp_report_range_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__PouchApp_report_specific_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__PouchApp_report_week_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__PouchApp_reset_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__PouchApp_reset_economic_profile_impl(
+        21 => wire__crate__api__PouchApp_remove_income_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__PouchApp_remove_period_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__PouchApp_remove_planned_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__PouchApp_remove_purchase_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__PouchApp_report_month_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__PouchApp_report_range_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__PouchApp_report_specific_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__PouchApp_report_week_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__PouchApp_reset_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__PouchApp_reset_economic_profile_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__PouchApp_save_budget_plan_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__PouchApp_save_essential_expense_impl(
+        31 => wire__crate__api__PouchApp_save_budget_plan_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__PouchApp_save_essential_expense_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        32 => wire__crate__api__PouchApp_save_period_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__PouchApp_save_planned_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__PouchApp_schedule_income_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__PouchApp_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__PouchApp_standard_forecast_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__PouchApp_stop_essential_expense_impl(
+        33 => wire__crate__api__PouchApp_save_period_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__PouchApp_save_planned_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__PouchApp_schedule_income_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__PouchApp_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__PouchApp_standard_forecast_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__PouchApp_stop_essential_expense_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        38 => wire__crate__api__PouchApp_today_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__PouchApp_undo_last_change_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__PouchApp_update_expected_income_impl(
+        39 => wire__crate__api__PouchApp_today_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__PouchApp_undo_last_change_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__PouchApp_update_expected_income_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        41 => wire__crate__api__PouchApp_update_income_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__PouchApp_update_preferences_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__download_economic_profile_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__economic_countries_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__reset_incompatible_storage_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__PouchApp_update_income_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__PouchApp_update_preferences_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__download_economic_profile_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__economic_countries_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__reset_incompatible_storage_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

@@ -85,6 +85,12 @@ Binary envelope 5/schema 7 marks the corrected savings calculation. Envelopes 3/
 
 ## Source map
 
+### Dashboard analytics
+
+The read-only `dashboard` module resolves date and period queries, aggregates integer-minor-unit financial data, and returns chart datasets through `PouchApp::dashboard` using the existing serialized Flutter Rust Bridge transport pattern. It reuses budget, expense, savings, calendar, period-assignment, and forecast services. Dated cash flow remains separate from period-assigned income; rollover, reservations, and savings allocations are not received income or purchases.
+
+Flutter owns dashboard-only selection state, responsive charts, accessible data views, and localized presentation. Dashboard never changes `PouchPeriodScope`. Rust supplies all totals, ratios, effective dates, and chart buckets. Existing mutation paths remain responsible for savings reconciliation after historical corrections. Historical cash and savings use recorded ledger entries; previous obligation definitions are not invented. See [Dashboard](docs/DASHBOARD.md) for metric definitions, retained-history limits, and pending manual validation.
+
 ### Financial forecast preview
 
 The dedicated Financial Forecast page reads pending expenses and savings goals created in Planned Expenses. The Rust forecast module owns calculations; Flutter owns a shared target selector, the recommendation income-basis selector and presentation. The read-only API never changes state, persistence, revision, or undo history.

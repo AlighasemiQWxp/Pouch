@@ -21,6 +21,16 @@ impl PouchApp {
         snapshot(&self.core)
     }
 
+    pub fn dashboard(&self, query: String) -> Result<String, String> {
+        let query: crate::dashboard::range::DashboardQuery =
+            serde_json::from_str(&query).map_err(|error| error.to_string())?;
+        let today = Date::from_naive_date(chrono::Local::now().date_naive())
+            .map_err(|error| error.to_string())?;
+        let snapshot = crate::dashboard::snapshot(self.core.state(), &query, today)
+            .map_err(|error| error.to_string())?;
+        serde_json::to_string(&snapshot).map_err(|error| error.to_string())
+    }
+
     pub fn today(&self) -> Result<String, String> {
         let today = chrono::Local::now().date_naive();
         Date::from_naive_date(today)

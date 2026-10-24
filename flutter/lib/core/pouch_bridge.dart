@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:pouch/src/rust/api.dart';
 import 'package:pouch/src/rust/api.dart' as economic_api;
 
+import '../features/dashboard/dashboard_models.dart';
 import 'pouch_models.dart';
 import 'pouch_platform.dart';
 
@@ -35,6 +36,13 @@ class PouchBridge {
       rethrow;
     }
   }
+
+  Future<DashboardData> dashboard(DashboardSelection selection) async =>
+      DashboardData.fromJson(
+        jsonDecode(
+          await _session.dashboard(query: jsonEncode(selection.toJson())),
+        ) as Map<String, dynamic>,
+      );
 
   Future<String> today() => _session.today();
 

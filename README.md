@@ -104,6 +104,7 @@ Country selection supplies regional defaults. Calendar and week start can be adj
 - Planned expenses that reserve money until paid
 - Automatic savings allocations shared across goals, with funded progress, daily spending adjustments, and completion estimates
 - Purchase history available on demand, with editing and undo for recent deletions
+- Dashboard with independent calendar and period filters, interactive cash-flow and savings charts, funding progress, and period comparisons (see [Dashboard](docs/DASHBOARD.md))
 - Reports for selected days, date ranges, weeks, and months, with PDF printing on Android
 - Local JSON backup and restore, with recovery copies for saved data
 

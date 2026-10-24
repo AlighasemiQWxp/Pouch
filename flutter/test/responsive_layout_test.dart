@@ -117,6 +117,7 @@ void main() {
               EnginePhase.sendSemanticsUpdate,
               const Duration(seconds: 5),
             );
+            expect(find.text(strings.text('dashboardTitle')), findsOneWidget);
             expect(find.text(strings.text('forecastTitle')), findsOneWidget);
             expect(find.text(strings.text('navPurchases')), findsNothing);
             expect(find.text(strings.text('navSavings')), findsNothing);
