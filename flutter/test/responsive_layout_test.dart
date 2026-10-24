@@ -89,9 +89,13 @@ void main() {
           expect(find.byType(PouchCoin), findsOneWidget);
           expect(find.text('Pouch'), findsOneWidget);
           if (width >= 1000) {
-            for (final page in AppPage.values.where(
-              (page) => page != AppPage.about,
-            )) {
+            for (final page in [
+              AppPage.today,
+              AppPage.budget,
+              AppPage.planned,
+              AppPage.insights,
+              AppPage.preferences,
+            ]) {
               final tile = find.byKey(ValueKey('nav-${page.name}'));
               await tester.ensureVisible(tile);
               await tester.tap(tile);
@@ -117,19 +121,19 @@ void main() {
               EnginePhase.sendSemanticsUpdate,
               const Duration(seconds: 5),
             );
-            expect(find.text(strings.text('dashboardTitle')), findsOneWidget);
-            expect(find.text(strings.text('forecastTitle')), findsOneWidget);
+            expect(find.text(strings.text('insightsTitle')), findsOneWidget);
+            expect(find.text(strings.text('forecastTitle')), findsNothing);
             expect(find.text(strings.text('navPurchases')), findsNothing);
             expect(find.text(strings.text('navSavings')), findsNothing);
             expect(find.text(strings.text('navAbout')), findsNothing);
             expect(tester.takeException(), isNull);
-            await tester.tap(find.text(strings.text('forecastTitle')));
+            await tester.tap(find.text(strings.text('insightsTitle')));
             await tester.pumpAndSettle(
               const Duration(milliseconds: 100),
               EnginePhase.sendSemanticsUpdate,
               const Duration(seconds: 5),
             );
-            expect(selectedPage, AppPage.forecast);
+            expect(selectedPage, AppPage.insights);
           }
           tester
               .widget<PouchAppShell>(find.byType(PouchAppShell))

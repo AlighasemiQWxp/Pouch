@@ -21,6 +21,8 @@ class PurchasesScreen extends StatefulWidget {
     this.selectedDate,
     this.embedded = false,
     this.working = false,
+    this.actionsOnly = false,
+    this.hideActions = false,
     super.key,
   });
   final PouchBridge bridge;
@@ -30,7 +32,7 @@ class PurchasesScreen extends StatefulWidget {
   final PouchMutation run;
   final PouchUndo undo;
   final String? selectedDate;
-  final bool embedded, working;
+  final bool embedded, working, actionsOnly, hideActions;
   @override
   State<PurchasesScreen> createState() => _PurchasesScreenState();
 }
@@ -71,6 +73,15 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
     final futureDay = date.compareTo(widget.today) > 0;
+    if (widget.actionsOnly) {
+      return PouchPrimaryButton(
+        label: widget.strings.text(
+          futureDay ? 'addPlannedExpense' : 'addPurchase',
+        ),
+        icon: Icons.add,
+        onPressed: widget.working ? null : () => edit(date, null),
+      );
+    }
     final children = <Widget>[
       if (!widget.embedded)
         PouchIntro(
@@ -94,13 +105,14 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                   ),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                PouchPrimaryButton(
-                  label: widget.strings.text(
-                    futureDay ? 'addPlannedExpense' : 'addPurchase',
+                if (!widget.hideActions)
+                  PouchPrimaryButton(
+                    label: widget.strings.text(
+                      futureDay ? 'addPlannedExpense' : 'addPurchase',
+                    ),
+                    icon: Icons.add,
+                    onPressed: widget.working ? null : () => edit(date, null),
                   ),
-                  icon: Icons.add,
-                  onPressed: widget.working ? null : () => edit(date, null),
-                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -275,46 +287,75 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       );
       return;
     }
-    final value = await showDialog<PurchaseValues>(
+    final id =
+        purchase?.id ?? DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    PurchaseValues? savedValues;
+    final saved = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (_) => PurchaseEditor(
         strings: widget.strings,
-        dateLabel: PouchDateLabel(
-          bridge: widget.bridge,
-          strings: widget.strings,
-          date: day,
-          calendar: widget.snapshot.preferences.calendar,
-        ),
+        bridge: widget.bridge,
+        currency: widget.snapshot.preferences.currency,
+        calendar: widget.snapshot.preferences.calendar,
+        weekStart: widget.snapshot.preferences.weekStart,
+        initialDate: day,
+        today: widget.today,
+        editing: purchase != null,
         initialDescription: purchase?.description ?? '',
         initialAmount: purchase == null
             ? ''
             : amountInput(purchase.amount, language: widget.strings.language),
         initialCategory: purchase?.category ?? 'other',
+        onSave: (value) async {
+          final accepted = await widget.run(() {
+            if (purchase == null) {
+              return widget.bridge.addPurchase(
+                id: id,
+                date: value.date,
+                description: value.description,
+                amount: value.amount,
+                category: value.category,
+              );
+            }
+            return widget.bridge.editPurchase(
+              date: day,
+              id: id,
+              description: value.description,
+              amount: value.amount,
+              category: value.category,
+            );
+          });
+          if (accepted) savedValues = value;
+          return accepted;
+        },
       ),
     );
-    if (value == null || !mounted) return;
-    if (purchase == null) {
-      final saved = await widget.run(
-        () => widget.bridge.addPurchase(
-          id: DateTime.now().microsecondsSinceEpoch.toRadixString(36),
-          date: day,
-          description: value.description,
-          amount: value.amount,
-          category: value.category,
+    if (saved != true || !mounted) return;
+    if (purchase == null) PouchMotion.celebrate(context);
+    final value = savedValues!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget.strings.text(
+            purchase == null ? 'expenseAdded' : 'expenseUpdated',
+          ),
         ),
-      );
-      if (saved && mounted) PouchMotion.celebrate(context);
-    } else {
-      await widget.run(
-        () => widget.bridge.editPurchase(
-          date: day,
-          id: purchase.id,
-          description: value.description,
-          amount: value.amount,
-          category: value.category,
+        action: SnackBarAction(
+          label: widget.strings.text('edit'),
+          onPressed: () => edit(
+            value.date,
+            PouchPurchase(
+              id: id,
+              description: value.description,
+              amount: parseMoneyEntry(value.amount)!,
+              category: value.category,
+              fundedByGoal: purchase?.fundedByGoal ?? false,
+            ),
+          ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   Future<void> remove(String day, PouchPurchase purchase) async {

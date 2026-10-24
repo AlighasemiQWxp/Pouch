@@ -48,6 +48,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _requestVersion = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadReport(reveal: false);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ReportsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.snapshot.revision != widget.snapshot.revision ||
+        oldWidget.strings.language != widget.strings.language) {
+      _loadReport(reveal: false);
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
@@ -437,7 +454,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     ),
   );
 
-  Future<void> _loadReport() async {
+  Future<void> _loadReport({bool reveal = true}) async {
     if ((_mode == _ReportMode.range && _from.compareTo(_through) > 0) ||
         (_mode == _ReportMode.specific && _selectedDays.isEmpty)) {
       setState(() {
@@ -446,7 +463,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _reportLoading = false;
         _requestVersion++;
       });
-      _revealPreview();
+      if (reveal) _revealPreview();
       return;
     }
     final requestVersion = ++_requestVersion;
@@ -455,7 +472,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _previewFailed = false;
       _reportLoading = true;
     });
-    _revealPreview();
+    if (reveal) _revealPreview();
     try {
       final report = await _createReport();
       if (!mounted || requestVersion != _requestVersion) return;
@@ -470,7 +487,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _reportLoading = false;
       });
     }
-    _revealPreview();
+    if (reveal) _revealPreview();
   }
 
   void _revealPreview() {

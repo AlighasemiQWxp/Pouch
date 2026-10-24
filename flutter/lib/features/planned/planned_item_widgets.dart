@@ -21,44 +21,58 @@ Future<void> editPlannedItem({
   String? initialPeriodId,
   String? initialDate,
   PouchPlannedItem? existing,
+  PouchRequiredExpense? recurringExpense,
 }) async {
   final periodId =
       existing?.periodId ??
-      selectedPouchPeriod(
-        snapshot,
-        initialPeriodId ?? PouchPeriodScope.maybeOf(context)?.periodId,
-      )?.id;
-  final result = await showDialog<_PlannedValues>(
+      initialPeriodId ??
+      periodForDay(snapshot, initialDate ?? today)?.id ??
+      snapshot.currentPeriod?.id;
+  final id = existing?.id ?? recurringExpense?.id ?? _newId();
+  final saved = await showDialog<bool>(
     context: context,
+    barrierDismissible: false,
     builder: (context) => _PlannedDialog(
       bridge: bridge,
       strings: strings,
       today: today,
-      firstDate: snapshot.startDate,
+      firstDate: firstPouchRecordDate,
       calendar: snapshot.preferences.calendar,
       weekStart: snapshot.preferences.weekStart,
       existing: existing,
+      recurringExpense: recurringExpense,
       initialKind: kind,
       initialDate: initialDate,
       periods: snapshot.periods,
       initialPeriodId: periodId,
+      onSave: (result) => run(() {
+        if (result.repeat != 'once' || recurringExpense != null) {
+          return bridge.saveEssentialExpense(
+            id: id,
+            name: result.description,
+            amount: result.amount,
+            date: result.date,
+            kind: result.repeat,
+            customDays: result.customDays,
+          );
+        }
+        return bridge.savePlanned(
+          id: id,
+          description: result.description,
+          amount: result.amount,
+          category: result.category,
+          kind: result.kind,
+          date: result.date,
+          periodId: result.periodId,
+        );
+      }),
     ),
   );
-  if (result == null || !context.mounted) return;
-  final saved = await run(
-    () => bridge.savePlanned(
-      id: existing?.id ?? _newId(),
-      description: result.description,
-      amount: result.amount,
-      category: result.category,
-      kind: result.kind,
-      date: result.date,
-      periodId: result.periodId,
-    ),
-  );
-  if (saved && context.mounted) {
-    PouchPeriodScope.maybeOf(context)?.onChanged(result.periodId);
-    if (existing == null) PouchMotion.celebrate(context);
+  if (saved == true &&
+      context.mounted &&
+      existing == null &&
+      recurringExpense == null) {
+    PouchMotion.celebrate(context);
   }
 }
 
@@ -108,6 +122,7 @@ class PlannedItemTile extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     this.working = false,
+    this.onForecast,
     super.key,
   });
 
@@ -121,6 +136,7 @@ class PlannedItemTile extends StatelessWidget {
   final PouchBridge bridge;
   final String today;
   final PouchMutation run;
+  final VoidCallback? onForecast;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -154,29 +170,63 @@ class PlannedItemTile extends StatelessWidget {
         ),
         if (pending)
           Text(
-            strings.text('pending'),
+            strings.text(
+              item.kind == 'goal'
+                  ? 'goalSaving'
+                  : (item.date.compareTo(today) < 0
+                        ? 'billOverdue'
+                        : (item.date.compareTo(
+                                    DateTime.parse('${today}T00:00:00Z')
+                                        .add(const Duration(days: 7))
+                                        .toIso8601String()
+                                        .substring(0, 10),
+                                  ) <=
+                                  0
+                              ? 'billDueSoon'
+                              : 'billUpcoming')),
+            ),
             style: TextStyle(color: context.pouchPalette.goldDeep),
           ),
         if (pending && item.kind == 'goal')
           FutureBuilder<PouchFinancialForecast>(
-            future: bridge.financialForecast(today, item.id),
+            future: bridge.financialForecast(
+              today,
+              item.id,
+              periodId: item.periodId,
+            ),
             builder: (context, value) {
               if (value.connectionState != ConnectionState.done ||
                   !value.hasData) {
                 return const SizedBox.shrink();
               }
-              return Text(
-                strings.text('planAllocated', {
-                  'amount': formatMoney(
-                    value.data!.allocated,
-                    currency,
-                    strings,
+              final allocated = value.data!.allocated;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    strings.text(
+                      allocated >= item.amount ? 'goalReady' : 'goalProgress',
+                      {
+                        'amount': formatMoney(allocated, currency, strings),
+                        'target': formatMoney(item.amount, currency, strings),
+                      },
+                    ),
                   ),
-                }),
-                style: TextStyle(
-                  color: context.pouchPalette.muted,
-                  fontSize: 11,
-                ),
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: item.amount <= 0
+                        ? 0
+                        : (allocated / item.amount).clamp(0.0, 1.0),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    strings.text('goalPurchaseHint'),
+                    style: TextStyle(
+                      color: context.pouchPalette.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               );
             },
           ),
@@ -207,8 +257,19 @@ class PlannedItemTile extends StatelessWidget {
           key: ValueKey('pay-${item.id}'),
           onPressed: working ? null : () => _recordPayment(context),
           icon: const Icon(Icons.check_circle_outline_rounded),
-          label: Text(strings.text('recordPayment')),
+          label: Text(
+            strings.text(
+              item.kind == 'goal' ? 'goalRecordPurchase' : 'recordPayment',
+            ),
+          ),
         ),
+        if (item.kind == 'goal' && onForecast != null)
+          TextButton.icon(
+            key: ValueKey('goal-forecast-${item.id}'),
+            onPressed: onForecast,
+            icon: const Icon(Icons.insights_outlined),
+            label: Text(strings.text('goalForecast')),
+          ),
         if (item.essentialId == null)
           PopupMenuButton<String>(
             enabled: !working,
@@ -247,35 +308,24 @@ class PlannedItemTile extends StatelessWidget {
             color: context.pouchPalette.goldDeep,
             size: 20,
           );
-          if (constraints.maxWidth < 560) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    iconWidget,
-                    const SizedBox(width: 11),
-                    Expanded(child: titleAndDate),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [amount, if (pending) actions],
-                ),
-              ],
-            );
-          }
-          return Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              iconWidget,
-              const SizedBox(width: 11),
-              Expanded(child: titleAndDate),
-              Flexible(child: amount),
-              if (pending) actions,
+              Row(
+                children: [
+                  iconWidget,
+                  const SizedBox(width: 11),
+                  Expanded(child: titleAndDate),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [amount, if (pending) actions],
+              ),
             ],
           );
         },
@@ -317,6 +367,8 @@ class _PlannedDialog extends StatefulWidget {
     required this.calendar,
     required this.weekStart,
     this.existing,
+    this.recurringExpense,
+    required this.onSave,
     this.initialKind = 'expense',
     this.initialDate,
     required this.periods,
@@ -330,6 +382,8 @@ class _PlannedDialog extends StatefulWidget {
   final String calendar;
   final int weekStart;
   final PouchPlannedItem? existing;
+  final PouchRequiredExpense? recurringExpense;
+  final Future<bool> Function(_PlannedValues values) onSave;
   final String initialKind;
   final String? initialDate;
   final List<PouchPeriod> periods;
@@ -341,168 +395,276 @@ class _PlannedDialog extends StatefulWidget {
 
 class _PlannedDialogState extends State<_PlannedDialog> {
   late final _description = TextEditingController(
-    text: widget.existing?.description ?? '',
+    text: widget.existing?.description ?? widget.recurringExpense?.name ?? '',
   );
   late final _amount = TextEditingController(
-    text: widget.existing == null
+    text: widget.existing == null && widget.recurringExpense == null
         ? ''
         : amountInput(
-            widget.existing!.amount,
+            widget.existing?.amount ?? widget.recurringExpense!.amount,
             language: widget.strings.language,
           ),
   );
   late String _date =
-      widget.existing?.date ?? widget.initialDate ?? widget.today;
+      widget.existing?.date ??
+      widget.recurringExpense?.date ??
+      widget.initialDate ??
+      widget.today;
   late final String _kind = widget.existing?.kind ?? widget.initialKind;
   late String _category = widget.existing?.category ?? 'other';
   bool _missingFields = false;
   late String? _periodId = widget.initialPeriodId;
+  late String _repeat = widget.recurringExpense?.recurrence ?? 'once';
+  late final _days = TextEditingController(
+    text: '${widget.recurringExpense?.customDays ?? 7}',
+  );
+  bool _saving = false;
+  String? _saveError;
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final interval = int.tryParse(localizedInteger(_days.text)) ?? 0;
+    if (_description.text.trim().isEmpty ||
+        (parseMoneyEntry(_amount.text) ?? 0) <= 0 ||
+        (_repeat == 'custom' && interval <= 0)) {
+      setState(() => _missingFields = true);
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    var accepted = false;
+    try {
+      accepted = await widget.onSave(
+        _PlannedValues(
+          _description.text.trim(),
+          _amount.text.trim(),
+          _category,
+          _kind,
+          _date,
+          _periodId,
+          _repeat,
+          interval,
+        ),
+      );
+    } catch (_) {
+      accepted = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      if (!accepted) _saveError = 'entrySaveFailed';
+    });
+    if (accepted) Navigator.pop(context, true);
+  }
 
   @override
   void dispose() {
     _description.dispose();
     _amount.dispose();
+    _days.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.strings.text(
-        widget.existing != null
-            ? 'editPlan'
-            : (_kind == 'goal' ? 'addGoal' : 'addPlannedExpense'),
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_saving,
+    child: AlertDialog(
+      title: Text(
+        widget.strings.text(
+          widget.existing != null || widget.recurringExpense != null
+              ? 'editPlan'
+              : (_kind == 'goal' ? 'addGoal' : 'addPlannedExpense'),
+        ),
       ),
-    ),
-    content: SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PouchPeriodSelector(
-            periods: widget.periods,
-            selectedId: _periodId,
-            strings: widget.strings,
-            onChanged: (id) => setState(() => _periodId = id),
-          ),
-          const SizedBox(height: 12),
-          Text(widget.strings.text('plannedEntryHint')),
-          const SizedBox(height: 12),
-          TextField(
-            autofocus: true,
-            textInputAction: TextInputAction.next,
-            controller: _description,
-            maxLength: 120,
-            decoration: InputDecoration(
-              labelText: widget.strings.text('description'),
-              errorText: _missingFields && _description.text.trim().isEmpty
-                  ? widget.strings.text('requiredField')
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _amount,
-            inputFormatters: [
-              PouchMoneyInputFormatter(widget.strings.language),
-            ],
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: widget.strings.text('amount'),
-              errorText: _missingFields && _amount.text.trim().isEmpty
-                  ? widget.strings.text('requiredField')
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
-            initialValue: _category,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: widget.strings.text('category'),
-            ),
-            items:
-                const [
-                      'other',
-                      'food',
-                      'transport',
-                      'shopping',
-                      'health',
-                      'entertainment',
-                      'bills',
-                    ]
-                    .map(
-                      (value) => DropdownMenuItem(
+      content: AbsorbPointer(
+        absorbing: _saving,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                controller: _description,
+                maxLength: 120,
+                decoration: InputDecoration(
+                  labelText: widget.strings.text('description'),
+                  errorText: _missingFields && _description.text.trim().isEmpty
+                      ? widget.strings.text('requiredField')
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _amount,
+                inputFormatters: [
+                  PouchMoneyInputFormatter(widget.strings.language),
+                ],
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: widget.strings.text('amount'),
+                  errorText:
+                      _missingFields &&
+                          (parseMoneyEntry(_amount.text) ?? 0) <= 0
+                      ? widget.strings.text('positiveAmount')
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (_repeat == 'once' && widget.recurringExpense == null)
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('planned-category'),
+                  initialValue: _category,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.text('category'),
+                  ),
+                  items:
+                      const [
+                            'other',
+                            'food',
+                            'transport',
+                            'shopping',
+                            'health',
+                            'entertainment',
+                            'bills',
+                          ]
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(widget.strings.text(value)),
+                            ),
+                          )
+                          .toList(growable: false),
+                  onChanged: (value) =>
+                      setState(() => _category = value ?? 'other'),
+                ),
+              const SizedBox(height: 10),
+              ListTile(
+                key: const ValueKey('planned-date'),
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  widget.strings.text(
+                    _kind == 'goal' ? 'targetDate' : 'dueDate',
+                  ),
+                ),
+                subtitle: PouchDateLabel(
+                  bridge: widget.bridge,
+                  strings: widget.strings,
+                  date: _date,
+                  calendar: widget.calendar,
+                ),
+                trailing: Icon(
+                  Icons.calendar_month_rounded,
+                  color: context.pouchPalette.goldDeep,
+                ),
+                onTap: () async {
+                  final picked = await showPouchDatePicker(
+                    context: context,
+                    bridge: widget.bridge,
+                    strings: widget.strings,
+                    initialDate: _date,
+                    calendar: widget.calendar,
+                    weekStart: widget.weekStart,
+                    firstDate: widget.firstDate,
+                    lastDate: lastPouchRecordDate,
+                  );
+                  if (mounted && picked != null) {
+                    setState(() => _date = picked);
+                  }
+                },
+              ),
+              if (_kind == 'expense' && widget.existing == null) ...[
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('bill-repeat'),
+                  initialValue: _repeat,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: widget.strings.text('billRepeat'),
+                  ),
+                  items: [
+                    for (final value in [
+                      'once',
+                      'weekly',
+                      'biweekly',
+                      'monthly',
+                      'custom',
+                    ])
+                      DropdownMenuItem(
                         value: value,
-                        child: Text(widget.strings.text(value)),
+                        child: Text(
+                          widget.strings.text(
+                            value == 'once' ? 'repeatNever' : 'schedule_$value',
+                          ),
+                        ),
                       ),
-                    )
-                    .toList(growable: false),
-            onChanged: (value) => setState(() => _category = value ?? 'other'),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _repeat = value!),
+                ),
+                if (_repeat == 'custom')
+                  TextField(
+                    controller: _days,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: widget.strings.text('intervalDays'),
+                      errorText:
+                          _missingFields &&
+                              (int.tryParse(localizedInteger(_days.text)) ??
+                                      0) <=
+                                  0
+                          ? widget.strings.text('positivePeriodDays')
+                          : null,
+                    ),
+                  ),
+                if (_repeat != 'once')
+                  Text(widget.strings.text('recurringBillCategoryHint')),
+              ],
+              if (_repeat == 'once' && widget.recurringExpense == null)
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(widget.strings.text('moreOptions')),
+                  children: [
+                    PouchPeriodSelector(
+                      bridge: widget.bridge,
+                      calendar: widget.calendar,
+                      periods: widget.periods,
+                      selectedId: _periodId,
+                      strings: widget.strings,
+                      onChanged: (id) => setState(() => _periodId = id),
+                    ),
+                    Text(widget.strings.text('plannedEntryHint')),
+                  ],
+                ),
+              if (widget.recurringExpense != null)
+                Text(widget.strings.text('essentialCorrectionHint')),
+              if (_saveError != null)
+                Text(
+                  widget.strings.text(_saveError!),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+            ],
           ),
-          const SizedBox(height: 10),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              widget.strings.text(_kind == 'goal' ? 'targetDate' : 'dueDate'),
-            ),
-            subtitle: PouchDateLabel(
-              bridge: widget.bridge,
-              strings: widget.strings,
-              date: _date,
-              calendar: widget.calendar,
-            ),
-            trailing: Icon(
-              Icons.calendar_month_rounded,
-              color: context.pouchPalette.goldDeep,
-            ),
-            onTap: () async {
-              final picked = await showPouchDatePicker(
-                context: context,
-                bridge: widget.bridge,
-                strings: widget.strings,
-                initialDate: _date,
-                calendar: widget.calendar,
-                weekStart: widget.weekStart,
-                firstDate: widget.firstDate,
-                lastDate: lastPouchRecordDate,
-              );
-              if (mounted && picked != null) {
-                setState(() => _date = picked);
-              }
-            },
-          ),
-        ],
+        ),
       ),
+
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
+          child: Text(widget.strings.text('cancel')),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(widget.strings.text(_saving ? 'savingEntry' : 'save')),
+        ),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: Text(widget.strings.text('cancel')),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (_periodId == null ||
-              _description.text.trim().isEmpty ||
-              _amount.text.trim().isEmpty) {
-            setState(() => _missingFields = true);
-            return;
-          }
-          Navigator.pop(
-            context,
-            _PlannedValues(
-              _description.text,
-              _amount.text,
-              _category,
-              _kind,
-              _date,
-              _periodId!,
-            ),
-          );
-        },
-        child: Text(widget.strings.text('save')),
-      ),
-    ],
   );
 }
 
@@ -608,13 +770,12 @@ class _PlannedValues {
     this.kind,
     this.date,
     this.periodId,
+    this.repeat,
+    this.customDays,
   );
-  final String description;
-  final String amount;
-  final String category;
-  final String kind;
-  final String date;
-  final String periodId;
+  final String description, amount, category, kind, date, repeat;
+  final String? periodId;
+  final int customDays;
 }
 
 class _PaymentValues {

@@ -98,3 +98,25 @@ Regression suites include explicit-period accounting, transactional changes, per
 .github/workflows/windows-desktop.yml runs on pushes to main, pull requests and manual dispatch. It uses Windows Server 2022 with the same pinned Flutter and Rust toolchains as Linux CI. It runs validate-and-build-windows.ps1, checks the executable version against pubspec.yaml, and uploads the complete portable ZIP and SHA256SUMS as an Actions artifact for 14 days. Repository permissions are read-only; publishing a GitHub Release is a separate step after successful validation.
 
 The maintainer confirmed builds and manual application testing on Android and Linux for the Version 3 source before its release version change. The Windows build is performed by CI. A successful Windows build does not establish interactive UI, printing or Windows 11 runtime acceptance; those checks must be recorded separately. See RELEASE_V3.md for the release scope.
+
+
+## Daily-use UX revision validation
+
+This revision changes the Flutter interface only; the Rust accounting API, data formats, and legacy root-level WebView application are unchanged. On October 25, 2026, the maintainer confirmed that required validation passed and application testing succeeded on Linux and an Android phone. Windows build verification is performed by GitHub Actions; this record does not claim manual Windows runtime testing.
+
+From `flutter`, run `dart format lib test`. From the repository root run `bash ./validate-and-build-linux.sh` on Linux or `./validate-and-build-windows.ps1` on Windows. These scripts check Rust formatting, Clippy and tests, Flutter formatting, analysis and tests, and the desktop build. For an Android release, also run `./validate-and-build.ps1` with the existing private signing configuration. Inspect formatting changes before approving synchronization; keep unrelated existing work separate.
+
+Regression acceptance checklist:
+
+- With disposable empty data, start setup from Today and Budget. Confirm currency/calendar, enter available money, choose the last budget day, and finish both with and without optional bills/savings. Confirm income is recorded once. Cancel before creation and after creation; only completed steps should persist.
+- Reject zero, invalid precision, and invalid values. Use English, Persian, and Arabic digits. Simulate a save failure and retry without losing form contents or duplicating records.
+- Record an expense with amount only, then with a category and note. Backdate a new expense, edit through the confirmation action, and verify history. Editing an existing expense preserves its original date. Future-day entries remain unpaid bills until explicitly paid.
+- Browse an old budget, return to Today, and verify the current day's estimate and expenses. Browse a past/future day and return to today. Check expired budgets and zero spending estimates, including displayed shortfall amounts.
+- Verify budget selectors and chart filters show Gregorian/Jalali date ranges without generated names, including at large text sizes. Historical budget notices must stay distinct from the current budget.
+- Add one-time and monthly bills from the same form, record a payment, edit a schedule, stop recurrence, and inspect earlier payments. Check overdue and next-seven-day filters. Confirm repeating bills use the Bills category.
+- Create two savings goals, view their funding progress, and open the second goal's forecast directly. A fully funded target must remain separate from a recorded purchase. Verify goals remain visible when another budget is selected.
+- Open Insights on mobile and desktop, switch between spending, reports, and forecasts, and confirm the monthly report loads initially. Exercise PDF export and custom date reports. Country comparison remains optional and uses its independent calculation basis.
+- Check English/Persian, LTR/RTL, both calendars, 320/360-pixel mobile widths, large text, keyboard dismissal, short desktop windows, and disabled controls during saves. Confirm dialogs preserve typed information on failures and show the relevant date/currency.
+- Reopen existing records and verify totals, period assignments, recurrence, backups, restore, and undo. Do not replace the archived screenshots until new captures have been verified.
+
+After all required checks pass, review the intended diff, commit only validated changes on main, push, compare local and remote hashes, and wait for GitHub CI. Existing unrelated modifications must not be included without their own validation.

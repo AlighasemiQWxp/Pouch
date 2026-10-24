@@ -17,6 +17,7 @@ import 'features/preferences/preferences_screen.dart';
 import 'features/reports/reports_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/today/today_screen.dart';
+import 'features/insights/insights_screen.dart';
 import 'widgets/pouch_app_shell.dart';
 import 'widgets/pouch_motion.dart';
 import 'widgets/pouch_period_selector.dart';
@@ -85,6 +86,8 @@ class _PouchApplicationState extends State<PouchApplication>
   AppPage _page = AppPage.today;
   String? _selectedDay;
   String? _selectedPeriodId;
+  String? _forecastTargetId;
+  bool _focusIncome = false;
   bool _working = false;
   Timer? _clock;
 
@@ -216,7 +219,13 @@ class _PouchApplicationState extends State<PouchApplication>
   }
 
   void _selectPage(AppPage page) {
-    if (mounted) setState(() => _page = page);
+    if (mounted) {
+      setState(() {
+        _page = page;
+        _focusIncome = false;
+        _forecastTargetId = null;
+      });
+    }
   }
 
   Future<void> _setThemeStyle(String style) async {
@@ -262,7 +271,11 @@ class _PouchApplicationState extends State<PouchApplication>
           selectedDate: _selectedDay ?? _today,
           onDateChanged: (date) => setState(() => _selectedDay = date),
           undo: _undoLastChange,
-          onOpenBudget: () => _selectPage(AppPage.budget),
+          onOpenBudget: () => setState(() {
+            _selectedPeriodId = _snapshot.currentPeriod?.id;
+            _focusIncome = true;
+            _page = AppPage.budget;
+          }),
           onOpenPlanned: () => _selectPage(AppPage.planned),
           run: _run,
         );
@@ -274,35 +287,27 @@ class _PouchApplicationState extends State<PouchApplication>
           today: _today,
           run: _run,
           undo: _undoLastChange,
+          onForecast: (item) => setState(() {
+            _forecastTargetId = item.id;
+            _selectedPeriodId = item.periodId ?? _snapshot.currentPeriod?.id;
+            _page = AppPage.forecast;
+          }),
         );
+      case AppPage.insights:
       case AppPage.forecast:
-        return FinancialForecastScreen(
-          bridge: widget.bridge,
-          snapshot: _snapshot,
-          strings: _strings,
-          today: _today,
-          run: _run,
-          onOpenPlanned: () => _selectPage(AppPage.planned),
-        );
       case AppPage.dashboard:
-        return DashboardScreen(
-          bridge: widget.bridge,
-          snapshot: _snapshot,
-          strings: _strings,
-          today: _today,
-          onOpenToday: () => _selectPage(AppPage.today),
-          onOpenBudget: () => _selectPage(AppPage.budget),
-          onOpenPlans: () => _selectPage(AppPage.planned),
-        );
       case AppPage.reports:
-        return ReportsScreen(
-          bridge: widget.bridge,
-          snapshot: _snapshot,
+        final section = _page == AppPage.insights ? AppPage.dashboard : _page;
+        return InsightsScreen(
+          section: section,
           strings: _strings,
-          today: _today,
+          onSelect: _selectPage,
+          child: _buildInsights(section),
         );
       case AppPage.budget:
         return BudgetScreen(
+          focusIncome: _focusIncome,
+          onSetupComplete: () => _selectPage(AppPage.today),
           bridge: widget.bridge,
           snapshot: _snapshot,
           strings: _strings,
@@ -323,6 +328,40 @@ class _PouchApplicationState extends State<PouchApplication>
         );
       case AppPage.about:
         return AboutScreen(bridge: widget.bridge, strings: _strings);
+    }
+  }
+
+  Widget _buildInsights(AppPage section) {
+    switch (section) {
+      case AppPage.forecast:
+        return FinancialForecastScreen(
+          bridge: widget.bridge,
+          snapshot: _snapshot,
+          strings: _strings,
+          today: _today,
+          run: _run,
+          onOpenPlanned: () => _selectPage(AppPage.planned),
+          initialTargetId: _forecastTargetId,
+        );
+      case AppPage.dashboard:
+        return DashboardScreen(
+          bridge: widget.bridge,
+          snapshot: _snapshot,
+          strings: _strings,
+          today: _today,
+          onOpenToday: () => _selectPage(AppPage.today),
+          onOpenBudget: () => _selectPage(AppPage.budget),
+          onOpenPlans: () => _selectPage(AppPage.planned),
+        );
+      case AppPage.reports:
+        return ReportsScreen(
+          bridge: widget.bridge,
+          snapshot: _snapshot,
+          strings: _strings,
+          today: _today,
+        );
+      default:
+        return const SizedBox.shrink();
     }
   }
 }

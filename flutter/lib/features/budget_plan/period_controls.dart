@@ -64,6 +64,8 @@ class PeriodControls extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           PouchPeriodSelector(
+            bridge: bridge,
+            calendar: snapshot.preferences.calendar,
             periods: snapshot.periods,
             selectedId: selected?.id,
             strings: strings,
@@ -118,7 +120,12 @@ class PeriodControls extends StatelessWidget {
                     key: ValueKey('select-${period.id}'),
                     contentPadding: EdgeInsets.zero,
                     selected: period.id == selected?.id,
-                    title: Text(period.displayName),
+                    title: PouchPeriodLabel(
+                      bridge: bridge,
+                      period: period,
+                      calendar: snapshot.preferences.calendar,
+                      strings: strings,
+                    ),
                     subtitle: dates(period),
                     trailing: period.id == selected?.id
                         ? const Icon(Icons.check_circle_outline)
@@ -133,14 +140,19 @@ class PeriodControls extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context, PouchPeriod period) async {
+    final label = await formatBudgetDates(
+      bridge,
+      period,
+      snapshot.preferences.calendar,
+      strings,
+    );
+    if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(strings.text('deletePeriod')),
         content: Text(
-          strings.text('deletePeriodConfirmation', {
-            'period': period.displayName,
-          }),
+          strings.text('deletePeriodConfirmation', {'period': label}),
         ),
         actions: [
           TextButton(

@@ -1,5 +1,7 @@
 # Financial Forecast
 
+Open forecasts through **Insights → Forecasts**, or use **View forecast** on a savings goal to open that target directly with its assigned budget. Goal funding progress and recording a purchase remain separate actions. Country comparison stays an optional expansion. Maintainer-confirmed validation and application testing on Linux and Android are recorded in DESKTOP.md.
+
 Rust owns forecasting, amounts, dates, allocations, assumptions, and validation. Flutter owns selectors, presentation, localization, and temporary loading state. Queries never change records, storage, revision, or undo history.
 
 ## Personal period selection

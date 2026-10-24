@@ -150,3 +150,31 @@ String formatJalaliDate(int year, int month, int day, String language) {
   final dayText = localizeDigits(day.toString().padLeft(2, '0'), language);
   return '$yearText$separator$monthText$separator$dayText';
 }
+
+int? parseMoneyEntry(String text) {
+  var value = text
+      .trim()
+      .replaceAll(',', '')
+      .replaceAll('٬', '')
+      .replaceAll('٫', '.');
+  for (var digit = 0; digit < 10; digit++) {
+    value = value
+        .replaceAll('۰۱۲۳۴۵۶۷۸۹'[digit], '$digit')
+        .replaceAll('٠١٢٣٤٥٦٧٨٩'[digit], '$digit');
+  }
+  if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(value)) return null;
+  final parts = value.split('.');
+  final whole = int.tryParse(parts.first);
+  if (whole == null || whole > 90000000000000) return null;
+  final fraction = parts.length == 2 ? int.parse(parts[1].padRight(2, '0')) : 0;
+  return whole * 100 + fraction;
+}
+
+String localizedInteger(String text) {
+  for (var digit = 0; digit < 10; digit++) {
+    text = text
+        .replaceAll('۰۱۲۳۴۵۶۷۸۹'[digit], '$digit')
+        .replaceAll('٠١٢٣٤٥٦٧٨٩'[digit], '$digit');
+  }
+  return text.trim();
+}

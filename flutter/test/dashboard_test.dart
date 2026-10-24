@@ -260,12 +260,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  Future<void> selectPeriod(WidgetTester tester, String name) async {
+  Future<void> selectPeriod(WidgetTester tester, String id) async {
     final selector = find.byType(DropdownButtonFormField<String>).last;
     await tester.ensureVisible(selector);
     await tester.tap(selector);
     await tester.pumpAndSettle();
-    await tester.tap(find.text(name).last);
+    final option = find
+        .ancestor(
+          of: find.byKey(ValueKey('dashboard-period-choice-$id')),
+          matching: find.byType(InkWell),
+        )
+        .hitTestable();
+    expect(option, findsOneWidget);
+    await tester.tap(option);
     await tester.pumpAndSettle();
   }
 
@@ -358,7 +365,7 @@ void main() {
       final bridge = _Bridge();
       await show(tester, bridge);
       if (manualMode == 'period') {
-        await selectPeriod(tester, 'February');
+        await selectPeriod(tester, _other.id);
         expect(bridge.requests.last.periodId, 'BP-002');
       } else {
         await selectRange(tester, 'custom');
@@ -480,7 +487,7 @@ void main() {
       find.text(strings['en']!.text('dashboardChoosePeriodHint')),
       findsOneWidget,
     );
-    await selectPeriod(tester, 'January');
+    await selectPeriod(tester, _period.id);
     expect(bridge.requests.last.mode, 'period');
     expect(bridge.requests.last.periodId, 'BP-001');
     expect(find.byKey(const ValueKey('dashboard-balance')), findsOneWidget);
@@ -501,7 +508,7 @@ void main() {
   ) async {
     final bridge = _Bridge();
     await show(tester, bridge);
-    await selectPeriod(tester, 'February');
+    await selectPeriod(tester, _other.id);
     await show(tester, bridge, snapshot: _snapshot('en', revision: 2));
     expect(bridge.requests.last.mode, 'period');
     expect(bridge.requests.last.periodId, 'BP-002');
@@ -529,7 +536,7 @@ void main() {
   ) async {
     final bridge = _Bridge();
     await show(tester, bridge);
-    await selectPeriod(tester, 'February');
+    await selectPeriod(tester, _other.id);
     await show(
       tester,
       bridge,
@@ -658,10 +665,7 @@ void main() {
       await selectRange(tester, mode);
       expect(bridge.requests.last.mode, mode);
     }
-    await tester.tap(find.byKey(const ValueKey('dashboard-period-BP-001')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('February').last);
-    await tester.pumpAndSettle();
+    await selectPeriod(tester, _other.id);
     expect(bridge.requests.last.periodId, 'BP-002');
     expect(sharedChanges, 0);
   });

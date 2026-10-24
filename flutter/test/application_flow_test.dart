@@ -300,6 +300,7 @@ class TestBridge extends PouchBridge {
     return currentRecords();
   }
 
+  List<PouchPlannedItem> forecastTargets = const [target];
   final personalPeriods = <String?>[];
   final standardDates = <String>[];
   @override
@@ -353,7 +354,7 @@ class TestBridge extends PouchBridge {
       expectedIncome.where((item) => item.periodId == period.id).toList(),
       0,
       const [],
-      targets: const [target],
+      targets: forecastTargets,
     );
   }
 
@@ -536,8 +537,11 @@ void main() {
     await tester.ensureVisible(add);
     await tester.tap(add);
     await settleApp(tester);
-    await tester.enterText(find.byType(TextField).at(0), 'Yesterday coffee');
-    await tester.enterText(find.byType(TextField).at(1), '1');
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1');
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-note')),
+      'Yesterday coffee',
+    );
     await tester.tap(find.text(englishStrings.text('save')));
     await settleApp(tester);
     expect(bridge.addedDate, '2024-01-09');
@@ -788,8 +792,11 @@ void main() {
         of: find.byType(AlertDialog),
         matching: find.byType(TextField),
       );
-      await tester.enterText(fields.at(0), 'A new $entry');
-      await tester.enterText(fields.at(1), '10');
+      await tester.enterText(
+        fields.at(entry == 'daily' ? 1 : 0),
+        'A new $entry',
+      );
+      await tester.enterText(fields.at(entry == 'daily' ? 0 : 1), '10');
       await tester.tap(find.text(englishStrings.text('save')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
@@ -806,8 +813,11 @@ void main() {
       await tester.ensureVisible(add);
       await tester.tap(add);
       await settleApp(tester);
-      await tester.enterText(fields.at(0), 'Rejected $entry');
-      await tester.enterText(fields.at(1), '10');
+      await tester.enterText(
+        fields.at(entry == 'daily' ? 1 : 0),
+        'Rejected $entry',
+      );
+      await tester.enterText(fields.at(entry == 'daily' ? 0 : 1), '10');
       await tester.tap(find.text(englishStrings.text('save')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
@@ -817,6 +827,11 @@ void main() {
             ? bridge.purchases.values.expand((items) => items).length
             : bridge.plans.length,
         1,
+      );
+      await settleApp(tester);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(
+        find.widgetWithText(TextButton, englishStrings.text('cancel')),
       );
       await settleApp(tester);
 
@@ -850,15 +865,9 @@ void main() {
       ),
     );
     await settleApp(tester);
-    expect(
-      find.text(
-        englishStrings.text('periodCalculationHint', {
-          'period': active.displayName,
-        }),
-      ),
-      findsOneWidget,
-    );
     await tester.tap(find.byKey(const ValueKey('nav-budget')));
+    await settleApp(tester);
+    await tester.tap(find.byKey(const ValueKey('income-calendar')));
     await settleApp(tester);
     final day = find.byKey(const ValueKey('income-date-2024-01-06'));
     await tester.ensureVisible(day);
@@ -891,15 +900,8 @@ void main() {
     await settleApp(tester);
     await tester.tap(find.byKey(const ValueKey('nav-today')));
     await settleApp(tester);
-    expect(
-      find.text(
-        englishStrings.text('periodCalculationHint', {
-          'period': past.displayName,
-        }),
-      ),
-      findsOneWidget,
-    );
-    expect(bridge.requestedPeriods.last, past.id);
+    expect(bridge.requestedPeriods.last, isNull);
+    expect(bridge.requestedDates.last, '2024-01-10');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   }, timeout: const Timeout(Duration(seconds: 30)));
@@ -936,6 +938,16 @@ void main() {
       );
       await settleApp(tester);
       final dialog = find.byType(AlertDialog);
+      final options = find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(
+          ExpansionTile,
+          englishStrings.text('moreOptions'),
+        ),
+      );
+      await tester.ensureVisible(options);
+      await tester.tap(options);
+      await settleApp(tester);
       final selector = find.descendant(
         of: dialog,
         matching: find.byType(PouchPeriodSelector),
@@ -951,7 +963,7 @@ void main() {
       );
       await tester.enterText(fields.at(0), 'Assigned $kind');
       await tester.enterText(fields.at(1), '10');
-      final due = find.descendant(of: dialog, matching: find.byType(ListTile));
+      final due = find.byKey(const ValueKey('planned-date'));
       await tester.ensureVisible(due);
       await tester.tap(due);
       await settleApp(tester);
@@ -964,6 +976,7 @@ void main() {
       expect(bridge.plans.values.single.date, '2024-01-12');
       expect(find.byKey(const ValueKey('pouch-coin-burst')), findsOneWidget);
       await settleApp(tester);
+      if (kind == 'expense') await choosePeriod(tester, past.id);
       expect(find.text('Assigned $kind'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -1044,7 +1057,7 @@ void main() {
         await settleApp(tester);
         await tester.tap(add);
         await settleApp(tester);
-        expect(find.text(strings.text('plannedEntryHint')), findsOneWidget);
+        expect(find.text(strings.text('billRepeat')), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       },
@@ -1088,6 +1101,7 @@ void main() {
     await settleApp(tester);
     expect(bridge.requestedDates, contains('2024-01-10'));
     expect(bridge.requestedDates, isNot(contains('2024-01-01')));
+    expect(bridge.requestedPeriods.last, isNull);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   }, timeout: const Timeout(Duration(seconds: 30)));
@@ -1108,6 +1122,8 @@ void main() {
     );
     await settleApp(tester);
     await tester.tap(find.byKey(const ValueKey('nav-budget')));
+    await settleApp(tester);
+    await tester.tap(find.text(strings.text('manualBudgetDates')));
     await settleApp(tester);
     await tester.tap(find.text(strings.text('createPeriod')).last);
     await settleApp(tester);

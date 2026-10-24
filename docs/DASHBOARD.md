@@ -1,6 +1,8 @@
 # Financial dashboard
 
-Open **More → Dashboard** on mobile, or **Dashboard** in the desktop sidebar. All financial queries run locally in Rust. The dashboard does not change the active budget period, Today’s selected date, stored records, revision, or undo history.
+The spending dashboard is now reached through **Insights → Spending** (under **More** on mobile). Reports and forecasts are adjacent sections. Budget filters display localized date ranges; persistent IDs and accounting rules are unchanged. Maintainer-confirmed validation and application testing on Linux and Android are recorded in DESKTOP.md.
+
+All financial queries run locally in Rust. The dashboard does not change the active budget period, Today’s selected date, stored records, revision, or undo history.
 
 ## Views
 

@@ -18,6 +18,7 @@ class FinancialForecastScreen extends StatefulWidget {
     required this.today,
     required this.run,
     required this.onOpenPlanned,
+    this.initialTargetId,
     super.key,
   });
 
@@ -27,6 +28,7 @@ class FinancialForecastScreen extends StatefulWidget {
   final String today;
   final PouchMutation run;
   final VoidCallback onOpenPlanned;
+  final String? initialTargetId;
 
   @override
   State<FinancialForecastScreen> createState() =>
@@ -34,7 +36,7 @@ class FinancialForecastScreen extends StatefulWidget {
 }
 
 class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
-  String? _selectedId;
+  late String? _selectedId = widget.initialTargetId;
   String? _periodId;
   String? _standardSelectedId;
   PouchPeriodView? _periodView;
@@ -73,6 +75,12 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
   @override
   void didUpdateWidget(covariant FinancialForecastScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTargetId != widget.initialTargetId &&
+        widget.initialTargetId != null) {
+      _selectedId = widget.initialTargetId;
+      _refresh();
+      return;
+    }
     if (oldWidget.snapshot != widget.snapshot ||
         oldWidget.today != widget.today ||
         oldWidget.bridge != widget.bridge ||
@@ -171,6 +179,8 @@ class _FinancialForecastScreenState extends State<FinancialForecastScreen> {
           description: strings.text('forecastPageHint'),
         ),
         PouchPeriodSelector(
+          bridge: widget.bridge,
+          calendar: widget.snapshot.preferences.calendar,
           periods: widget.snapshot.periods,
           selectedId: _periodId,
           strings: strings,

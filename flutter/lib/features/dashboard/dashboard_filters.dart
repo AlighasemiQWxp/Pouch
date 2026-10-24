@@ -5,6 +5,7 @@ import '../../core/pouch_bridge.dart';
 import '../../core/pouch_models.dart';
 import '../../widgets/pouch_date_picker.dart';
 import '../../widgets/pouch_widgets.dart';
+import '../../widgets/pouch_period_selector.dart';
 import 'dashboard_models.dart';
 
 class DashboardFilters extends StatelessWidget {
@@ -101,10 +102,14 @@ class DashboardFilters extends StatelessWidget {
           items: [
             for (final period in snapshot.periods)
               DropdownMenuItem(
+                key: ValueKey('dashboard-period-choice-${period.id}'),
                 value: period.id,
-                child: Text(
-                  period.displayName,
-                  overflow: TextOverflow.ellipsis,
+                child: PouchPeriodLabel(
+                  bridge: bridge,
+                  period: period,
+                  calendar: snapshot.preferences.calendar,
+                  strings: strings,
+                  compact: true,
                 ),
               ),
           ],
@@ -141,6 +146,18 @@ class DashboardFilters extends StatelessWidget {
               ),
           ],
         ),
+      if (selection.mode == 'period' &&
+          (MediaQuery.sizeOf(context).width < 600 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3))
+        for (final period in snapshot.periods.where(
+          (p) => p.id == selection.periodId,
+        ))
+          PouchPeriodLabel(
+            bridge: bridge,
+            period: period,
+            calendar: snapshot.preferences.calendar,
+            strings: strings,
+          ),
       if (selection.mode != 'monthly' || selection.anchor != today)
         Align(
           alignment: AlignmentDirectional.centerStart,

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add guided first-budget setup with currency, calendar, available money, budget end date, and optional bills and savings.
+- Prioritize expense and income actions on Today and keep daily estimates independent of historical budget selection.
+- Show localized budget dates, group charts/reports/forecasts under Insights, and open forecasts directly from savings goals.
+- Add amount-first expense entry with optional notes, editable dates for new expenses, retained input after save failures, and an Edit confirmation action.
+- Combine one-time and recurring bill creation, add due-date filters, and distinguish goal funding from purchases.
+- Update English and Persian guidance and add regression coverage. The maintainer confirmed validation passed and application testing succeeded on Linux and Android on October 25, 2026.
+
 ## 3.0.0
 
 ### Build 6 savings correction

@@ -4,98 +4,54 @@
 
 # Pouch
 
-Pouch is an offline spending planner with a Flutter interface and a Rust core. Version 2 supports Android, Windows x64, and Linux x64. It helps you plan a budget, record income and purchases, reserve money for upcoming expenses, track savings goals, and prepare reports.
+Pouch is an offline spending planner with a Flutter interface and a Rust core. It supports Android, Windows x64, and Linux x64. It helps you plan a budget, record income and purchases, reserve money for upcoming expenses, track savings goals, and prepare reports.
 
 The project is maintained by [AlighasemiQWxp](https://github.com/AlighasemiQWxp).
 
-The default Classic theme uses cream and light brown. The interface bundles Vazirmatn for offline Persian and English text. Mobile navigation groups Today, Budget, and Plans alongside More; desktop navigation exposes the additional tools in the sidebar. About is available from Settings.
+The default Classic theme uses cream and light brown. The interface bundles Vazirmatn for offline Persian and English text. Mobile navigation groups Today, Budget, and Bills & goals alongside More; desktop navigation also exposes Insights and Settings in the sidebar. About is available from Settings.
 
-Periods can be edited or deleted from Budget Plan. Deletion requires confirmation and is available only for periods without linked financial records. Removing an unused period extends an adjacent period to keep the calendar continuous.
+Periods can be edited or deleted from Budget. Deletion requires confirmation and is available only for periods without linked financial records. Removing an unused period extends an adjacent period to keep the calendar continuous.
 
 ## App walkthrough
 
-These Android screenshots show the English interface with the Classic theme and Jalali dates. Pouch also supports Persian and runs on Linux and Windows.
+### Start with a budget
 
-### 1. Today: review a day and record expenses
+On Today, choose **Set up my budget**. Confirm the currency and calendar, enter money already available for the budget, and choose the last day it should cover. The amount is recorded as received income today. Budget creation and that receipt use the existing transactional core operation. Optional bills and savings follow; the estimate uses only recorded information. Bills already saved remain when optional savings are skipped. Existing records keep their currency.
 
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224301.jpg">
-    <img src="ScreenShots/IMG_20261019_224301.jpg" alt="Today with date selection, available spending, and expense entry" width="360">
-  </a>
-</p>
+### Today: record everyday spending
 
-Choose a date with the calendar or day arrows, review the available spending, and record purchases in the list underneath. Future entries become planned expenses until paid. Budget details expand when needed. The selected period is named above the daily view; changing periods preserves your selected calendar date.
+Today puts the daily spending estimate and **Add expense** before the activity list. **Add income** opens the current budget's income form. Choose another day with the compact date controls; the estimate follows that day independently of historical budget selection elsewhere. **Back to today** returns to the current date.
 
-### 2. Budget Plan: manage periods, income, and savings
+Expense entry starts with the amount and currency, defaults to the viewed day, and offers quick categories and optional notes. New expenses can be backdated in the form. Existing expense dates remain fixed when editing. A failed save keeps the form and its contents open. The save confirmation offers **Edit**. Future-day entries remain planned bills until payment is recorded.
 
-Create a period, select it from the named period selector, and use Edit period or Delete period to manage it. Deletion requires confirmation and protects periods with linked financial records. Choose a date directly in the income calendar, enter an amount, and press Add Income or Save Income. The active period is selected by default, and assignment is independent of the receipt date. Future income remains expected until received. Savings settings and earlier revisions are available in the same tab.
+Upcoming bills and **How is this calculated?** appear below daily activity. The explanation distinguishes spending money, bill reservations, and savings allocations. Pouch does not move or lock money.
 
-### 3. Plans: upcoming expenses and savings goals
+### Budget: income, dates, and savings
 
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224323.jpg">
-    <img src="ScreenShots/IMG_20261019_224323.jpg" alt="Plans with a named period and a car savings goal" width="360">
-  </a>
-</p>
+Budgets are shown by localized date ranges rather than generated names. Income defaults to today; expand the date control to use the income calendar. Future income stays expected until received. Saved income and bills retain explicit period assignments, including assignments outside their calendar dates through advanced options. Period editing, deletion, and savings history remain available.
 
-Choose a period, switch between Expenses and Savings goals, and add a target with an amount and date. Each entry can belong to a period independently of its due date. Record payment when money is actually spent; use the entry menu to edit or delete it. Set-aside amounts are budget allocations, not transfers to a separate bank account.
+### Bills & goals
 
-### 4. Financial Forecast: estimate when you can afford a goal
+Use **Add a bill** for a one-time payment or choose a repeat schedule in the same form. Repeating bills use the Bills category and their existing core recurrence rules. Manage and stop schedules below the bill list. Unpaid bills can be filtered to overdue or due within seven days. Recording payment remains separate from planning it.
 
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224356.jpg">
-    <img src="ScreenShots/IMG_20261019_224356.jpg" alt="Personal forecast with period selection and a savings goal estimate" width="360">
-  </a>
-</p>
+Savings goals show money set aside against the target, with progress and a direct **View forecast** action. Reaching the target does not record a purchase. Use **Record purchase** only after spending the money. Goals remain visible across budget selections.
 
-Select a period at the top, then choose an expense or savings goal. Review the estimated completion date and expand the budget details or spending scenarios when needed. Forecasts are estimates based on the plan, not guaranteed outcomes.
+### Insights
 
-### 5. Compare a country scenario
+Open **More → Insights** on mobile, or **Insights** in the desktop sidebar. **Spending**, **Reports**, and **Forecasts** share this destination. Reports load the current month's report on entry and retain custom date selection and PDF export. A goal's forecast shortcut opens that goal directly. Country comparisons remain optional and separate from the personal budget.
 
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224437.jpg">
-    <img src="ScreenShots/IMG_20261019_224437.jpg" alt="Country comparison showing income, saving capacity, and estimated completion" width="360">
-  </a>
-</p>
+### Settings and backups
 
-The country comparison uses today and its own target selection. Explore estimated take-home income, saving capacity, currency conversion, and completion dates without changing your budget. Expand Sources, reference periods and assumptions to inspect the calculation.
+Settings contains English/Persian language selection, Classic/Ocean/Forest themes, regional preferences, and backup export/restore. Export a backup before uninstalling or clearing app data. Currency labels do not convert records.
 
-### 6. Reports: review spending and export a PDF
-
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224454.jpg">
-    <img src="ScreenShots/IMG_20261019_224454.jpg" alt="Report date selection and PDF export" width="360">
-  </a>
-</p>
-
-Choose specific days, a date range, a week, or a month, then press Show report. Reports separate actual spending from unpaid plans and include category totals, daily totals, and individual purchases. Use Export PDF to prepare a printable report.
-
-### 7. Settings: language and appearance
-
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224518.jpg">
-    <img src="ScreenShots/IMG_20261019_224518.jpg" alt="Settings with language selection and Classic, Ocean, and Forest themes" width="360">
-  </a>
-</p>
-
-Choose English or Persian and select Classic, Ocean, or Forest. Classic is the default cream and light brown theme. Both languages use the bundled Vazirmatn font.
-
-### 8. Settings: regional preferences and backups
-
-<p align="center">
-  <a href="ScreenShots/IMG_20261019_224553.jpg">
-    <img src="ScreenShots/IMG_20261019_224553.jpg" alt="Regional preferences and local backup controls" width="360">
-  </a>
-</p>
-
-Country selection supplies regional defaults. Calendar and week start can be adjusted independently. Currency labels do not convert recorded amounts. Export a backup before uninstalling or clearing app data; restore backups from Settings. Recovery and reset controls are under More options.
+The images in `ScreenShots/` document the earlier interface. They have not yet been replaced with captures of this UX revision. The maintainer confirmed successful validation and application testing on Linux and Android on October 25, 2026. See the regression checklist in [desktop validation](docs/DESKTOP.md).
 
 ## Features
 
 - English and Persian interfaces, with right-to-left Persian layouts and Gregorian or Jalali calendars
 - Country-based currency, calendar, and week-start defaults, with manual calendar and week-start choices
 - Recorded income and future expected income, kept separate until it is marked received
-- Backdated income and purchases in Budget Plan and Today, including dates before first use; earlier records extend the first budget plan and carry-forward history
+- Backdated income and purchases in Budget and Today, including dates before first use; earlier records extend the first budget plan and carry-forward history
 - Income calendar with explicit period choices, editable planning horizons, rollover, period savings plans, and independently recurring essential bills
 - Responsive desktop/mobile navigation, daily expenses within Today, combined expenses and savings goals in Plans, and consistent English/Persian presentation
 - Financial Forecast with a shared target, clear completion/deadline status, expandable improvements and country comparison (see [Financial Forecast](docs/FINANCIAL_FORECAST.md))
@@ -103,7 +59,7 @@ Country selection supplies regional defaults. Calendar and week start can be adj
 - Daily spending recommendations with carry-forward balances
 - Planned expenses that reserve money until paid
 - Automatic savings allocations shared across goals, with funded progress, daily spending adjustments, and completion estimates
-- Purchase history available on demand, with editing and undo for recent deletions
+- Expense history available on demand, with editing and undo for recent deletions
 - Dashboard with independent calendar and period filters, interactive cash-flow and savings charts, funding progress, and period comparisons (see [Dashboard](docs/DASHBOARD.md))
 - Reports for selected days, date ranges, weeks, and months, with PDF printing on Android
 - Local JSON backup and restore, with recovery copies for saved data

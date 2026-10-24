@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:pouch/core/pouch_bridge.dart';
 import 'package:pouch/core/app_strings.dart';
 import 'package:pouch/core/pouch_models.dart';
 import 'package:pouch/core/pouch_theme.dart';
@@ -31,7 +33,22 @@ const past = PouchPeriod(
   status: 'closed',
 );
 
+class CalendarBridge extends PouchBridge {
+  @override
+  Future<(int, int, int)> dateParts(String date, String calendar) async =>
+      (1402, 10, DateTime.parse(date).day + 10);
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  final localizedStrings = <String, AppStrings>{};
+  setUpAll(() async {
+    await initializeDateFormatting('en');
+    await initializeDateFormatting('fa');
+    for (final language in ['en', 'fa']) {
+      localizedStrings[language] = await AppStrings.load(language);
+    }
+  });
   for (final language in ['en', 'fa']) {
     for (final width in [320.0, 600.0]) {
       testWidgets(
@@ -39,26 +56,7 @@ void main() {
         (tester) async {
           await tester.binding.setSurfaceSize(Size(width, 800));
           addTearDown(() => tester.binding.setSurfaceSize(null));
-          final strings = AppStrings(
-            language,
-            language == 'fa'
-                ? {
-                    'budgetPeriod': 'دوره بودجه',
-                    'choosePeriod': 'انتخاب دوره',
-                    'periodCalculationHint':
-                        'محاسبات این بخش بر اساس دورهٔ {period} انجام می‌شود.',
-                    'choosePeriodHint':
-                        'برای ادامه، یک دوره بودجه بسازید یا انتخاب کنید.',
-                  }
-                : {
-                    'budgetPeriod': 'Budget period',
-                    'choosePeriod': 'Choose a period',
-                    'periodCalculationHint':
-                        'Calculations in this section use period {period}.',
-                    'choosePeriodHint':
-                        'Create or select a budget period to continue.',
-                  },
-          );
+          final strings = localizedStrings[language]!;
           var selected = active.id;
           await tester.pumpWidget(
             MaterialApp(
@@ -76,6 +74,8 @@ void main() {
                         padding: const EdgeInsets.all(16),
                         child: StatefulBuilder(
                           builder: (context, setState) => PouchPeriodSelector(
+                            bridge: CalendarBridge(),
+                            calendar: language == 'fa' ? 'persian' : 'gregory',
                             periods: const [past, active],
                             selectedId: selected,
                             strings: strings,
@@ -90,13 +90,15 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
+          expect(find.text(active.displayName), findsNothing);
+          expect(find.text(strings.text('currentBudget')), findsOneWidget);
           expect(
             find.text(
-              strings.text('periodCalculationHint', {
-                'period': active.displayName,
-              }),
+              language == 'fa'
+                  ? '۱۴۰۲ / ۱۰ / ۱۸ – ۱۴۰۲ / ۱۰ / ۲۴'
+                  : 'Jan 8, 2024 – Jan 14, 2024',
             ),
-            findsOneWidget,
+            findsWidgets,
           );
           final field = tester.widget<DropdownButtonFormField<String>>(
             find.byType(DropdownButtonFormField<String>),
@@ -105,16 +107,11 @@ void main() {
           field.onChanged!(past.id);
           await tester.pumpAndSettle();
           expect(selected, past.id);
-          expect(
-            find.text(
-              strings.text('periodCalculationHint', {
-                'period': past.displayName,
-              }),
-            ),
-            findsOneWidget,
-          );
+          expect(find.text(strings.text('otherBudget')), findsOneWidget);
+          expect(find.text(past.displayName), findsNothing);
           expect(tester.takeException(), isNull);
         },
+        timeout: const Timeout(Duration(seconds: 30)),
       );
     }
   }
@@ -132,6 +129,8 @@ void main() {
         theme: buildPouchTheme(),
         home: Scaffold(
           body: PouchPeriodSelector(
+            bridge: CalendarBridge(),
+            calendar: 'gregory',
             periods: const [],
             selectedId: null,
             strings: strings,

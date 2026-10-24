@@ -6,6 +6,7 @@ import 'pouch_coin.dart';
 
 enum AppPage {
   today,
+  insights,
   budget,
   planned,
   forecast,
@@ -17,6 +18,7 @@ enum AppPage {
 
 String pageLabel(AppPage page) => switch (page) {
   AppPage.today => 'navToday',
+  AppPage.insights => 'insightsTitle',
   AppPage.budget => 'navBudget',
   AppPage.planned => 'plansTitle',
   AppPage.forecast => 'forecastTitle',
@@ -27,6 +29,7 @@ String pageLabel(AppPage page) => switch (page) {
 };
 IconData pageIcon(AppPage page) => switch (page) {
   AppPage.today => Icons.space_dashboard_outlined,
+  AppPage.insights => Icons.insights_outlined,
   AppPage.budget => Icons.account_balance_wallet_outlined,
   AppPage.planned => Icons.event_note_outlined,
   AppPage.forecast => Icons.insights_outlined,
@@ -57,7 +60,13 @@ class PouchAppShell extends StatelessWidget {
     builder: (context, constraints) {
       final desktop = constraints.maxWidth >= 1000;
       final primary = [AppPage.today, AppPage.budget, AppPage.planned];
-      final navigationPage = page == AppPage.about ? AppPage.preferences : page;
+      final navigationPage = switch (page) {
+        AppPage.about => AppPage.preferences,
+        AppPage.dashboard ||
+        AppPage.forecast ||
+        AppPage.reports => AppPage.insights,
+        _ => page,
+      };
       final index = primary.indexOf(navigationPage);
       return Scaffold(
         appBar: AppBar(
@@ -67,7 +76,7 @@ class PouchAppShell extends StatelessWidget {
               : null,
           title: desktop
               ? Text(
-                  strings.text(pageLabel(page)),
+                  strings.text(pageLabel(navigationPage)),
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 20,
@@ -96,7 +105,7 @@ class PouchAppShell extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      strings.text(pageLabel(page)),
+                      strings.text(pageLabel(navigationPage)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -159,9 +168,13 @@ class PouchAppShell extends StatelessWidget {
                         child: ListView(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           children: [
-                            for (final item in AppPage.values.where(
-                              (item) => item != AppPage.about,
-                            ))
+                            for (final item in [
+                              AppPage.today,
+                              AppPage.budget,
+                              AppPage.planned,
+                              AppPage.insights,
+                              AppPage.preferences,
+                            ])
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: ListTile(
@@ -263,16 +276,18 @@ class PouchAppShell extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final item in [
-              AppPage.dashboard,
-              AppPage.forecast,
-              AppPage.reports,
-              AppPage.preferences,
-            ])
+            for (final item in [AppPage.insights, AppPage.preferences])
               ListTile(
                 leading: Icon(pageIcon(item)),
                 title: Text(strings.text(pageLabel(item))),
-                selected: page == item,
+                selected:
+                    page == item ||
+                    (item == AppPage.insights &&
+                        [
+                          AppPage.dashboard,
+                          AppPage.forecast,
+                          AppPage.reports,
+                        ].contains(page)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   onSelect(item);

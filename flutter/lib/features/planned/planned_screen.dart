@@ -18,6 +18,7 @@ class PlannedScreen extends StatefulWidget {
     required this.run,
     required this.undo,
     this.kind = 'expense',
+    this.onForecast,
     super.key,
   });
 
@@ -28,6 +29,7 @@ class PlannedScreen extends StatefulWidget {
   final PouchMutation run;
   final PouchUndo undo;
   final String kind;
+  final ValueChanged<PouchPlannedItem>? onForecast;
 
   @override
   State<PlannedScreen> createState() => _PlannedScreenState();
@@ -50,8 +52,10 @@ class _PlannedScreenState extends State<PlannedScreen> {
             .where(
               (item) =>
                   item.kind == _kind &&
-                  (item.periodId == null || item.periodId == selected?.id) &&
-                  (_statusFilter == 'all' || item.status == _statusFilter),
+                  (_kind == 'goal' ||
+                      item.periodId == null ||
+                      item.periodId == selected?.id) &&
+                  _matchesStatus(item),
             )
             .toList()
           ..sort((left, right) => left.date.compareTo(right.date));
@@ -62,15 +66,18 @@ class _PlannedScreenState extends State<PlannedScreen> {
           title: strings.text('plansTitle'),
           description: strings.text('plansHint'),
         ),
-        PouchPeriodSelector(
-          periods: widget.snapshot.periods,
-          selectedId: selected?.id,
-          strings: strings,
-          onChanged: (id) {
-            setState(() => _periodId = id);
-            PouchPeriodScope.maybeOf(context)?.onChanged(id);
-          },
-        ),
+        if (_kind == 'expense')
+          PouchPeriodSelector(
+            bridge: widget.bridge,
+            calendar: widget.snapshot.preferences.calendar,
+            periods: widget.snapshot.periods,
+            selectedId: selected?.id,
+            strings: strings,
+            onChanged: (id) {
+              setState(() => _periodId = id);
+              PouchPeriodScope.maybeOf(context)?.onChanged(id);
+            },
+          ),
         const SizedBox(height: 16),
         Wrap(
           spacing: 10,
@@ -82,7 +89,10 @@ class _PlannedScreenState extends State<PlannedScreen> {
                   strings.text(kind == 'goal' ? 'navSavings' : 'navPlanned'),
                 ),
                 selected: _kind == kind,
-                onSelected: (_) => setState(() => _kind = kind),
+                onSelected: (_) => setState(() {
+                  _kind = kind;
+                  _statusFilter = 'pending';
+                }),
               ),
           ],
         ),
@@ -114,21 +124,34 @@ class _PlannedScreenState extends State<PlannedScreen> {
               Align(
                 alignment: AlignmentDirectional.centerEnd,
                 child: SizedBox(
-                  width: 170,
+                  width: 220,
                   child: DropdownButtonFormField<String>(
+                    key: ValueKey('plan-status-$_kind'),
                     initialValue: _statusFilter,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(horizontal: 10),
                     ),
-                    items: ['pending', 'paid', 'all']
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(strings.text(value)),
-                          ),
-                        )
-                        .toList(growable: false),
+                    items:
+                        (_kind == 'goal'
+                                ? ['pending', 'paid', 'all']
+                                : [
+                                    'pending',
+                                    'dueSoon',
+                                    'overdue',
+                                    'paid',
+                                    'all',
+                                  ])
+                            .map(
+                              (value) => DropdownMenuItem(
+                                value: value,
+                                child: Text(
+                                  strings.text(_statusLabel(value)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
                     onChanged: (value) =>
                         setState(() => _statusFilter = value ?? 'pending'),
                   ),
@@ -158,13 +181,17 @@ class _PlannedScreenState extends State<PlannedScreen> {
                     bridge: widget.bridge,
                     today: widget.today,
                     run: widget.run,
+                    onForecast: widget.onForecast == null
+                        ? null
+                        : () => widget.onForecast!(item),
                     onEdit: () => _editPlan(item),
                     onDelete: () => _deletePlan(item),
                   ),
             ],
           ),
         ),
-        if (_kind == 'expense') ...[
+        if (_kind == 'expense' &&
+            widget.snapshot.essentials.any((item) => item.until == null)) ...[
           const SizedBox(height: 20),
           EssentialExpenses(
             bridge: widget.bridge,
@@ -177,6 +204,36 @@ class _PlannedScreenState extends State<PlannedScreen> {
         ],
       ],
     );
+  }
+
+  bool _matchesStatus(PouchPlannedItem item) {
+    if (_statusFilter == 'all') return true;
+    if (_statusFilter == 'overdue') {
+      return item.status == 'pending' && item.date.compareTo(widget.today) < 0;
+    }
+    if (_statusFilter == 'dueSoon') {
+      final through = DateTime.parse('${widget.today}T00:00:00Z')
+          .add(const Duration(days: 7))
+          .toIso8601String()
+          .substring(0, 10);
+      return item.status == 'pending' &&
+          item.date.compareTo(widget.today) >= 0 &&
+          item.date.compareTo(through) <= 0;
+    }
+    return item.status == _statusFilter;
+  }
+
+  String _statusLabel(String status) {
+    if (status == 'all') return 'all';
+    if (_kind == 'goal') {
+      return status == 'paid' ? 'goalPurchased' : 'goalSaving';
+    }
+    return switch (status) {
+      'paid' => 'paid',
+      'overdue' => 'billOverdue',
+      'dueSoon' => 'billDueSoon',
+      _ => 'billUnpaid',
+    };
   }
 
   Future<void> _editPlan([PouchPlannedItem? existing]) => editPlannedItem(
