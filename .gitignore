@@ -11,6 +11,7 @@
 /gradle/
 **/local.properties
 **/key.properties
+**/signing.properties
 **/*.jks
 **/*.keystore
 **/*.p12
@@ -20,6 +21,8 @@
 flutter/.metadata
 **/.dart_tool/
 **/build/
+*.apk
+*.aab
 flutter/.flutter-plugins
 flutter/.flutter-plugins-dependencies
 flutter/.packages
@@ -30,10 +33,13 @@ flutter/.packages
 # Environment files and editor state
 .env
 .env.*
-!.env.example
 .DS_Store
 Thumbs.db
 *.iml
+*.tmp
+*.temp
+*.swp
+*.log
 
 # Local-only directories
 /app/
