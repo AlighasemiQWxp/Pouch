@@ -294,6 +294,14 @@ pub struct PlannedItem {
     pub essential_id: Option<String>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinancialMetadata {
+    pub income_labels: BTreeMap<String, String>,
+    pub goal_allocations: BTreeMap<String, i64>,
+    pub savings_purchases: std::collections::BTreeSet<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppState {
@@ -312,10 +320,12 @@ pub struct AppState {
     pub economic_assumptions: BTreeMap<String, crate::economics::Assumptions>,
     #[serde(default)]
     pub period_context: crate::periods::context::PeriodContext,
+    #[serde(default)]
+    pub financial_metadata: FinancialMetadata,
 }
 
 impl AppState {
-    pub const CURRENT_SCHEMA_VERSION: u16 = 7;
+    pub const CURRENT_SCHEMA_VERSION: u16 = 8;
 
     pub fn fresh(start_date: Date) -> Self {
         let preferences = Preferences::default();
@@ -334,6 +344,7 @@ impl AppState {
             planned: Vec::new(),
             economic_assumptions: BTreeMap::new(),
             period_context: crate::periods::context::PeriodContext::default(),
+            financial_metadata: FinancialMetadata::default(),
         }
     }
 
@@ -345,6 +356,38 @@ impl AppState {
 
     pub fn validate(&self) -> PouchResult<()> {
         crate::economics::validate_assumptions(&self.economic_assumptions)?;
+        if self
+            .financial_metadata
+            .income_labels
+            .iter()
+            .any(|(id, label)| {
+                label.trim().is_empty()
+                    || label.encode_utf16().count() > 120
+                    || !self.income.iter().any(|item| &item.id == id)
+            })
+            || self
+                .financial_metadata
+                .goal_allocations
+                .iter()
+                .any(|(id, amount)| {
+                    *amount < 0
+                        || !self.planned.iter().any(|item| {
+                            &item.id == id
+                                && item.kind == PlannedKind::Goal
+                                && *amount <= item.amount.hundredths()
+                        })
+                })
+            || self.financial_metadata.savings_purchases.iter().any(|key| {
+                !self.days.iter().any(|(date, day)| {
+                    day.purchases.iter().any(|item| {
+                        !item.funded_by_goal
+                            && crate::savings::purchase_key(*date, &item.id) == *key
+                    })
+                })
+            })
+        {
+            return Err(PouchError::InvalidState);
+        }
         if self.schema_version != Self::CURRENT_SCHEMA_VERSION
             || self.plans.len() > 10_000
             || self.planned.len() > 100_000

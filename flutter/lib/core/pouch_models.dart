@@ -47,10 +47,17 @@ class PouchCalendarMonth {
 }
 
 class PouchIncome {
-  const PouchIncome(this.id, this.date, this.amount, {this.periodId});
+  const PouchIncome(
+    this.id,
+    this.date,
+    this.amount, {
+    this.periodId,
+    this.label,
+  });
 
   final String id;
   final String? periodId;
+  final String? label;
   final String date;
   final int amount;
 
@@ -59,6 +66,7 @@ class PouchIncome {
     value.date as String,
     value.amount as int,
     periodId: value.periodId as String?,
+    label: value.label as String?,
   );
 }
 
@@ -251,6 +259,7 @@ class PouchPurchase {
     required this.amount,
     required this.category,
     required this.fundedByGoal,
+    this.fundedBySavings = false,
   });
 
   final String id;
@@ -258,6 +267,7 @@ class PouchPurchase {
   final int amount;
   final String category;
   final bool fundedByGoal;
+  final bool fundedBySavings;
 
   factory PouchPurchase.fromBridge(dynamic value) => PouchPurchase(
     id: value.id as String,
@@ -265,6 +275,7 @@ class PouchPurchase {
     amount: value.amount as int,
     category: value.category as String,
     fundedByGoal: value.fundedByGoal as bool,
+    fundedBySavings: value.fundedBySavings as bool,
   );
 }
 
@@ -295,6 +306,7 @@ class PouchPlannedItem {
     required this.purchaseId,
     this.essentialId,
     this.periodId,
+    this.allocated = 0,
   });
 
   final String id;
@@ -308,6 +320,7 @@ class PouchPlannedItem {
   final String? purchaseId;
   final String? essentialId;
   final String? periodId;
+  final int allocated;
 
   factory PouchPlannedItem.fromBridge(dynamic value) => PouchPlannedItem(
     id: value.id as String,
@@ -321,6 +334,7 @@ class PouchPlannedItem {
     purchaseId: value.purchaseId as String?,
     essentialId: value.essentialId as String?,
     periodId: value.periodId as String?,
+    allocated: value.allocated as int,
   );
 }
 

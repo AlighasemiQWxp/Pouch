@@ -54,6 +54,7 @@ class SetupBridge extends TestBridge {
     int customDays = 7,
     String? through,
     bool expected = false,
+    String? label,
   }) async {
     receiptCalls++;
     if (failReceipt) throw StateError('Could not save');
@@ -69,6 +70,7 @@ class SetupBridge extends TestBridge {
       kind: kind,
       customDays: customDays,
       through: through,
+      label: label,
     );
   }
 

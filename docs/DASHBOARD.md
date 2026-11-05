@@ -58,20 +58,20 @@ Snapshot refreshes preserve a valid manual period or date-range selection. If th
 | Planned versus paid | Expense obligations explicitly assigned to the comparison period, or unassigned obligations due in its displayed overlap, against linked payments through its inspection date. This is not a total discretionary-spending budget. |
 | Savings contributions / releases | Positive and negative recorded allocation changes, displayed separately. Neither is counted as income or an expense. |
 | Savings minimum | The saved whole-period minimum from `budget::plan_at` at the inspection date. It is not prorated for a partial date range. |
-| Net allocations | Signed allocations within the displayed period overlap. Corrections can make this negative; goal funding can make contributions exceed the minimum. |
-| Goal progress | Outstanding goals use `forecast::preview` to share existing savings once, in the established funding order. The first 20 are displayed with an omission notice if needed. |
+| Net allocations | Signed allocations within the displayed period overlap. Corrections can make this negative. Goal assignment does not create a savings contribution. |
+| Goal progress | Outstanding goals use `forecast::preview` to display the amount explicitly assigned by the user. The first 20 are displayed with an omission notice if needed. |
 
 Position and funding figures describe the whole account at the inspection date, not only money created during the selected range. Date-mode goal progress uses the period containing the inspection date. The main balance card shows its whole-account inspection date. Detailed metric explanations appear inside their relevant sections.
 
 ## Historical accuracy
 
-Receipt and payment dates remain authoritative for cash-flow charts. Savings history uses signed recorded allocations minus actual goal-funded purchases. Savings form part of cash; the two balance lines must not be added together.
+Receipt and payment dates remain authoritative for cash-flow charts. Savings history uses signed recorded allocations minus goal-funded and other savings-funded purchases. Savings form part of cash; the two balance lines must not be added together.
 
 Cash and savings opening balances include earlier records. Each point carries an exact start and end date. Up to 90 days use daily points, up to 730 use consecutive seven-day buckets anchored at the range start, and longer ranges use calendar-month buckets, including partial first and last months. Flow buckets preserve complete totals. Balance points are bucket-end balances; they do not interpolate transactions or invent intrabucket history.
 
 Historical corrections are read from the updated records and reconciled allocations. Dashboard queries do not reconcile, mutate, or persist state themselves. Existing mutation services own that work.
 
-Old versions of edited or deleted obligations and goals are not retained. The dashboard therefore does not claim to reconstruct historical free-to-spend balances or original goal definitions. Position, obligation comparisons, and goal funding are recalculated from currently retained definitions at the selected inspection date. There is no invented historical spending budget.
+Old versions of edited or deleted obligations, goals, and goal assignments are not retained. The dashboard therefore does not claim to reconstruct historical free-to-spend balances or original goal definitions. Position, obligation comparisons, and goal funding are recalculated from currently retained definitions at the selected inspection date. There is no invented historical spending budget.
 
 ## Implementation map
 

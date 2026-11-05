@@ -599,3 +599,27 @@ fn missing_active_period_stays_missing_while_a_monthly_dashboard_is_available() 
         assert_eq!(app.export_backup().unwrap(), backup);
     }
 }
+
+#[test]
+fn savings_funded_daily_purchase_is_included_in_savings_series() {
+    let mut state = records();
+    receive(&mut state, "salary", "2024-01-01", 100_000);
+    budget::save_plan(
+        &mut state,
+        BudgetPlan {
+            period_id: "BP-001".into(),
+            effective: date("2024-01-01"),
+            savings: money(50_000),
+        },
+    )
+    .unwrap();
+    buy(&mut state, "food", "2024-01-02", 10_000);
+    state
+        .financial_metadata
+        .savings_purchases
+        .insert(savings::purchase_key(date("2024-01-02"), "food"));
+    savings::reconcile(&mut state, date("2024-01-02")).unwrap();
+    let result = view(&state, "2024-01-01", "2024-01-02");
+    assert_eq!(result.points.last().unwrap().savings, 40_000);
+    assert_eq!(result.protected_savings, 40_000);
+}

@@ -64,6 +64,7 @@ Future<void> editPlannedItem({
           kind: result.kind,
           date: result.date,
           periodId: result.periodId,
+          allocated: result.allocated,
         );
       }),
     ),
@@ -405,6 +406,12 @@ class _PlannedDialogState extends State<_PlannedDialog> {
             language: widget.strings.language,
           ),
   );
+  late final _allocated = TextEditingController(
+    text: amountInput(
+      widget.existing?.allocated ?? 0,
+      language: widget.strings.language,
+    ),
+  );
   late String _date =
       widget.existing?.date ??
       widget.recurringExpense?.date ??
@@ -446,6 +453,7 @@ class _PlannedDialogState extends State<_PlannedDialog> {
           _periodId,
           _repeat,
           interval,
+          _allocated.text.trim(),
         ),
       );
     } catch (_) {
@@ -463,6 +471,7 @@ class _PlannedDialogState extends State<_PlannedDialog> {
   void dispose() {
     _description.dispose();
     _amount.dispose();
+    _allocated.dispose();
     _days.dispose();
     super.dispose();
   }
@@ -515,6 +524,22 @@ class _PlannedDialogState extends State<_PlannedDialog> {
                       : null,
                 ),
               ),
+              if (_kind == 'goal') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _allocated,
+                  inputFormatters: [
+                    PouchMoneyInputFormatter(widget.strings.language),
+                  ],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: widget.strings.text('goalAssignSavings'),
+                    helperText: widget.strings.text('goalAssignSavingsHint'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               if (_repeat == 'once' && widget.recurringExpense == null)
                 DropdownButtonFormField<String>(
@@ -772,8 +797,9 @@ class _PlannedValues {
     this.periodId,
     this.repeat,
     this.customDays,
+    this.allocated,
   );
-  final String description, amount, category, kind, date, repeat;
+  final String description, amount, category, kind, date, repeat, allocated;
   final String? periodId;
   final int customDays;
 }

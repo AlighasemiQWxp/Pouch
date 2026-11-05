@@ -91,6 +91,7 @@ pub fn remove(state: &mut AppState, id: &str) -> PouchResult<()> {
     let original_length = state.income.len();
     state.income.retain(|entry| entry.id != id);
     state.period_context.income.remove(id);
+    state.financial_metadata.income_labels.remove(id);
     state.receipts.retain(|receipt| receipt.income_id != id);
     if state.income.len() == original_length {
         return Err(PouchError::InvalidEntry);

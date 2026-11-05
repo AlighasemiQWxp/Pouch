@@ -58,7 +58,7 @@ The images in `ScreenShots/` document the earlier interface. They have not yet b
 - Standard Forecast with automatic data retrieval for all seven named countries, deadline saving and income requirements, currency conversion, offline caching and optional local assumptions (see [Economic Profiles](docs/ECONOMIC_PROFILES.md))
 - Daily spending recommendations with carry-forward balances
 - Planned expenses that reserve money until paid
-- Automatic savings allocations shared across goals, with funded progress, daily spending adjustments, and completion estimates
+- Explicit assignment of existing savings to goals, with funded progress and completion estimates
 - Expense history available on demand, with editing and undo for recent deletions
 - Dashboard with independent calendar and period filters, interactive cash-flow and savings charts, funding progress, and period comparisons (see [Dashboard](docs/DASHBOARD.md))
 - Reports for selected days, date ranges, weeks, and months, with PDF printing on Android
@@ -66,7 +66,7 @@ The images in `ScreenShots/` document the earlier interface. They have not yet b
 
 Pouch keeps budgeting data on the device. Its recommendations are calculations from recorded income and expenses, not a bank balance or a promise of future income.
 
-Explicit periods retain stable IDs and their original planning calendar; changing the display calendar does not move saved dates. Shared boundaries and plan references are validated transactionally. Only received income funds recommendations. Cash and deficits carry forward without creating synthetic income. Pending expenses are reserved before savings; essential bills are included in that reservation once. Savings allocations are recorded, goal contributions are credited once per period, and goal payments consume them. Backdated corrections replay affected later allocations. Expected income remains separate until received, including when its actual date or amount differs. Financial forecasts are read-only estimates. See [data formats](docs/DATA_FORMAT.md) for the intentional storage break and [architecture](ARCHITECTURE.md) for the accounting rules.
+Explicit periods retain stable IDs and their original planning calendar; changing the display calendar does not move saved dates. Shared boundaries and plan references are validated transactionally. Only received income funds recommendations. Cash and deficits carry forward without creating synthetic income. Pending expenses are reserved before savings; essential bills are included in that reservation once. Savings-plan allocations are recorded, users assign savings to goals explicitly, and savings-funded purchases consume them. Backdated corrections replay affected later allocations. Expected income remains separate until received, including when its actual date or amount differs. Financial forecasts are read-only estimates. See [data formats](docs/DATA_FORMAT.md) for the intentional storage break and [architecture](ARCHITECTURE.md) for the accounting rules.
 
 Today shows the spending recommendation, expense entry, and relevant planned expenses. Expense history opens only when requested, with name search and date filtering for paid and planned expenses.
 

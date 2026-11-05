@@ -102,6 +102,19 @@ mod tests {
             amount: Money::from_hundredths(25_000).expect("valid amount"),
         });
         let day = state.start_date;
+        state.plans.push(crate::models::BudgetPlan {
+            period_id: "BP-001".into(),
+            effective: day,
+            savings: Money::from_hundredths(25_000).unwrap(),
+        });
+        state
+            .financial_metadata
+            .goal_allocations
+            .insert("car".into(), 20_000);
+        state
+            .financial_metadata
+            .goal_allocations
+            .insert("home".into(), 5_000);
         crate::savings::reconcile(&mut state, day).expect("allocate savings");
         let goals = forecast(&state, state.start_date).expect("valid forecast");
         assert_eq!(goals[0].projected, 20_000);
@@ -150,6 +163,19 @@ mod tests {
             amount: Money::from_hundredths(25_000).expect("valid amount"),
         });
         let day = state.start_date;
+        state.plans.push(crate::models::BudgetPlan {
+            period_id: "BP-001".into(),
+            effective: day,
+            savings: Money::from_hundredths(25_000).unwrap(),
+        });
+        state
+            .financial_metadata
+            .goal_allocations
+            .insert("car".into(), 20_000);
+        state
+            .financial_metadata
+            .goal_allocations
+            .insert("home".into(), 5_000);
         crate::savings::reconcile(&mut state, day).expect("allocate savings");
         crate::expenses::mark_paid(
             &mut state,

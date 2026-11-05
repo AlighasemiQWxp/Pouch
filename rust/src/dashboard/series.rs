@@ -43,7 +43,12 @@ pub fn build(state: &AppState, range: Range) -> PouchResult<Vec<Point>> {
         let day = ledger.entry(*date).or_default();
         for item in &record.purchases {
             day.expenses = total(day.expenses, item.amount.hundredths())?;
-            if item.funded_by_goal {
+            if item.funded_by_goal
+                || state
+                    .financial_metadata
+                    .savings_purchases
+                    .contains(&crate::savings::purchase_key(*date, &item.id))
+            {
                 day.goal_payments = total(day.goal_payments, item.amount.hundredths())?;
             }
         }

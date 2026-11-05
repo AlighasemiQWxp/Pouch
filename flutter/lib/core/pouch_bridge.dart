@@ -113,6 +113,7 @@ class PouchBridge {
     required String description,
     required String amount,
     required String category,
+    bool useSavings = false,
   }) async => PouchSnapshot.fromBridge(
     await _session.addPurchase(
       id: id,
@@ -120,6 +121,7 @@ class PouchBridge {
       description: description,
       amount: amount,
       category: category,
+      useSavings: useSavings,
     ),
   );
 
@@ -129,6 +131,7 @@ class PouchBridge {
     required String description,
     required String amount,
     required String category,
+    bool useSavings = false,
   }) async => PouchSnapshot.fromBridge(
     await _session.editPurchase(
       date: date,
@@ -136,6 +139,7 @@ class PouchBridge {
       description: description,
       amount: amount,
       category: category,
+      useSavings: useSavings,
     ),
   );
 
@@ -149,12 +153,14 @@ class PouchBridge {
     required String date,
     required String amount,
     String? periodId,
+    String? label,
   }) async => PouchSnapshot.fromBridge(
     await _session.updateIncome(
       id: id,
       date: date,
       amount: amount,
       periodId: periodId,
+      label: label,
     ),
   );
 
@@ -244,6 +250,7 @@ class PouchBridge {
     int customDays = 7,
     String? through,
     bool expected = false,
+    String? label,
   }) async => PouchSnapshot.fromBridge(
     await _session.receiveIncome(
       receipt: ReceiveIncomeRequest(
@@ -256,6 +263,7 @@ class PouchBridge {
         customDays: customDays,
         through: through,
         expected: expected,
+        label: label,
       ),
     ),
   );
@@ -303,6 +311,7 @@ class PouchBridge {
     required String category,
     required String kind,
     required String date,
+    String? allocated,
   }) async => PouchSnapshot.fromBridge(
     await _session.savePlanned(
       id: id,
@@ -312,6 +321,7 @@ class PouchBridge {
       category: category,
       kind: kind,
       date: date,
+      allocated: allocated,
     ),
   );
 

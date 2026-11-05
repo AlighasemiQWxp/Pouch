@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:pouch/core/app_strings.dart';
 import 'package:pouch/core/pouch_bridge.dart';
+import 'package:pouch/core/pouch_formatters.dart';
 import 'package:pouch/core/pouch_models.dart';
 import 'package:pouch/main.dart';
 import 'package:pouch/features/budget_plan/period_controls.dart';
@@ -102,6 +103,7 @@ class TestBridge extends PouchBridge {
     required String description,
     required String amount,
     required String category,
+    bool useSavings = false,
   }) async {
     if (rejectPurchases) throw StateError('Invalid amount');
     addedDate = date;
@@ -114,6 +116,7 @@ class TestBridge extends PouchBridge {
             amount: 100,
             category: category,
             fundedByGoal: false,
+            fundedBySavings: useSavings,
           ),
         );
     return records(
@@ -195,6 +198,7 @@ class TestBridge extends PouchBridge {
     int customDays = 7,
     String? through,
     bool expected = false,
+    String? label,
   }) async {
     receivedIncome.add(
       PouchIncome(
@@ -202,6 +206,7 @@ class TestBridge extends PouchBridge {
         date,
         (double.parse(amount.replaceAll(',', '')) * 100).round(),
         periodId: periodId,
+        label: label,
       ),
     );
     if (expected) expectedIncome.removeWhere((item) => item.id == id);
@@ -234,6 +239,7 @@ class TestBridge extends PouchBridge {
 
   @override
   Future<PouchSnapshot> savePlanned({
+    String? allocated,
     required String id,
     required String description,
     required String amount,
@@ -254,6 +260,7 @@ class TestBridge extends PouchBridge {
       status: 'pending',
       paidDate: null,
       purchaseId: null,
+      allocated: parseMoneyEntry(allocated ?? '0') ?? 0,
     );
     return currentRecords();
   }
@@ -722,7 +729,7 @@ void main() {
     await settleApp(tester);
     expect(find.byKey(const ValueKey('pouch-coin-burst')), findsNothing);
 
-    final savings = find.byType(TextField).at(1);
+    final savings = find.byKey(const ValueKey('savings-amount'));
     await tester.ensureVisible(savings);
     await tester.enterText(savings, '50');
     final save = find.text(englishStrings.text('savePlan'));
@@ -797,10 +804,14 @@ void main() {
         'A new $entry',
       );
       await tester.enterText(fields.at(entry == 'daily' ? 0 : 1), '10');
+      if (entry == 'daily')
+        await tester.tap(find.text(englishStrings.text('payFromSavings')));
       await tester.tap(find.text(englishStrings.text('save')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(burst, findsOneWidget);
+      if (entry == 'daily')
+        expect(bridge.purchases.values.single.single.fundedBySavings, isTrue);
       await settleApp(tester);
       expect(burst, findsNothing);
       final savedCount = entry == 'daily'
@@ -873,12 +884,18 @@ void main() {
     await tester.ensureVisible(day);
     await tester.tap(day);
     await tester.enterText(find.byType(TextField).first, '100');
+    await tester.enterText(
+      find.byKey(const ValueKey('income-label')),
+      'Birthday',
+    );
     final save = find.text(englishStrings.text('addIncome'));
     await tester.ensureVisible(save);
     await tester.tap(save);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(bridge.receivedIncome.single.date, '2024-01-06');
+    expect(bridge.receivedIncome.single.label, 'Birthday');
+    expect(find.text('Birthday'), findsWidgets);
     expect(bridge.receivedIncome.single.periodId, active.id);
     expect(find.byKey(const ValueKey('pouch-coin-burst')), findsOneWidget);
     expect(find.text(englishStrings.text('incomeDestination')), findsNothing);
@@ -901,7 +918,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('nav-today')));
     await settleApp(tester);
     expect(bridge.requestedPeriods.last, isNull);
-    expect(bridge.requestedDates.last, '2024-01-10');
+    expect(bridge.requestedDates, contains('2024-01-10'));
+    expect(bridge.requestedDates.last, '2024-01-11');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   }, timeout: const Timeout(Duration(seconds: 30)));
@@ -963,6 +981,7 @@ void main() {
       );
       await tester.enterText(fields.at(0), 'Assigned $kind');
       await tester.enterText(fields.at(1), '10');
+      if (kind == 'goal') await tester.enterText(fields.at(2), '5');
       final due = find.byKey(const ValueKey('planned-date'));
       await tester.ensureVisible(due);
       await tester.tap(due);
@@ -972,6 +991,7 @@ void main() {
       await tester.tap(find.text(englishStrings.text('save')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
+      if (kind == 'goal') expect(bridge.plans.values.single.allocated, 500);
       expect(bridge.plans.values.single.periodId, past.id);
       expect(bridge.plans.values.single.date, '2024-01-12');
       expect(find.byKey(const ValueKey('pouch-coin-burst')), findsOneWidget);

@@ -27,6 +27,24 @@ pub(crate) struct PreviousState {
     economic_assumptions: BTreeMap<String, crate::economics::Assumptions>,
 }
 
+#[derive(Deserialize)]
+pub(crate) struct PreviousStateV7 {
+    schema_version: u16,
+    start_date: Date,
+    preferences: Preferences,
+    periods: Vec<BudgetPeriod>,
+    essentials: Vec<RequiredExpense>,
+    allocations: Vec<SavingsAllocation>,
+    receipts: Vec<IncomeReceipt>,
+    income: Vec<IncomeEntry>,
+    expected_income: Vec<ExpectedIncomeEntry>,
+    plans: Vec<BudgetPlan>,
+    days: BTreeMap<Date, DailyRecord>,
+    planned: Vec<PlannedItem>,
+    economic_assumptions: BTreeMap<String, crate::economics::Assumptions>,
+    period_context: crate::periods::context::PeriodContext,
+}
+
 impl PreviousState {
     pub fn upgrade(self) -> PouchResult<AppState> {
         if self.schema_version != 5 {
@@ -47,9 +65,36 @@ impl PreviousState {
             planned: self.planned,
             economic_assumptions: self.economic_assumptions,
             period_context: Default::default(),
+            financial_metadata: Default::default(),
         };
         state.validate()?;
         crate::periods::context::synchronize(&mut state);
+        repair_savings(state)
+    }
+}
+
+impl PreviousStateV7 {
+    pub fn upgrade(self) -> PouchResult<AppState> {
+        if !matches!(self.schema_version, 6 | 7) {
+            return Err(PouchError::UnsupportedStorageVersion);
+        }
+        let state = AppState {
+            schema_version: AppState::CURRENT_SCHEMA_VERSION,
+            start_date: self.start_date,
+            preferences: self.preferences,
+            periods: self.periods,
+            essentials: self.essentials,
+            allocations: self.allocations,
+            receipts: self.receipts,
+            income: self.income,
+            expected_income: self.expected_income,
+            plans: self.plans,
+            days: self.days,
+            planned: self.planned,
+            economic_assumptions: self.economic_assumptions,
+            period_context: self.period_context,
+            financial_metadata: Default::default(),
+        };
         repair_savings(state)
     }
 }

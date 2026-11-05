@@ -629,7 +629,7 @@ fn version_nine_backup_repairs_savings_and_keeps_every_ledger_record() {
     let current = backup::export_json(&repaired).unwrap();
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&current).unwrap()["version"],
-        10
+        11
     );
     assert_eq!(backup::import_json(&current).unwrap(), repaired);
     let dir = tempfile::tempdir().unwrap();
@@ -732,7 +732,7 @@ fn repair_keeps_goal_payments_and_their_historical_funding() {
         budget::recommend(&repaired, date("2024-01-09"))
             .unwrap()
             .savings,
-        62_000
+        0
     );
     let after = budget::funding(&repaired, date("2024-01-10")).unwrap();
     assert_eq!(after.savings, 0);

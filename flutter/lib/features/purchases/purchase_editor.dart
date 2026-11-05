@@ -19,6 +19,8 @@ class PurchaseEditor extends StatefulWidget {
     this.initialDescription = '',
     this.initialAmount = '',
     this.initialCategory = 'other',
+    this.initialUseSavings = false,
+    this.allowSavings = true,
     super.key,
   });
   final AppStrings strings;
@@ -26,6 +28,7 @@ class PurchaseEditor extends StatefulWidget {
   final String currency, calendar, initialDate, today;
   final int weekStart;
   final bool editing;
+  final bool initialUseSavings, allowSavings;
   final String initialDescription, initialAmount, initialCategory;
   final Future<bool> Function(PurchaseValues values) onSave;
 
@@ -40,6 +43,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
   late final _amount = TextEditingController(text: widget.initialAmount);
   late String _category = widget.initialCategory;
   late String _date = widget.initialDate;
+  late bool _useSavings = widget.initialUseSavings;
   bool _saving = false;
   String? _error;
   bool _invalidAmount = false;
@@ -72,6 +76,7 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
           _amount.text.trim(),
           _category,
           _date,
+          _useSavings,
         ),
       );
     } catch (_) {
@@ -152,6 +157,16 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
                         }
                       },
               ),
+              if (widget.allowSavings)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(widget.strings.text('payFromSavings')),
+                  subtitle: Text(widget.strings.text('payFromSavingsHint')),
+                  value: _useSavings,
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _useSavings = value),
+                ),
               Text(widget.strings.text('category')),
               const SizedBox(height: 8),
               Wrap(
@@ -211,6 +226,13 @@ class _PurchaseEditorState extends State<PurchaseEditor> {
 }
 
 class PurchaseValues {
-  const PurchaseValues(this.description, this.amount, this.category, this.date);
+  const PurchaseValues(
+    this.description,
+    this.amount,
+    this.category,
+    this.date, [
+    this.useSavings = false,
+  ]);
   final String description, amount, category, date;
+  final bool useSavings;
 }

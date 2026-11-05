@@ -170,14 +170,30 @@ fn forecast_plan(
     let mut selected_rate = None;
     let mut selected_allocated = 0;
     for item in items {
-        let (total, pool, rate) = match item.kind {
-            PlannedKind::Goal => (&mut goal_total, saved, &mut goal_rate),
-            PlannedKind::Expense => (&mut expense_total, expense_pool, &mut expense_rate),
+        let (allocated, remaining, rate) = match item.kind {
+            PlannedKind::Goal => {
+                let allocated = state
+                    .financial_metadata
+                    .goal_allocations
+                    .get(&item.id)
+                    .copied()
+                    .unwrap_or(0);
+                goal_total = add(goal_total, (item.amount.hundredths() - allocated).max(0))?;
+                (allocated, goal_total, &mut goal_rate)
+            }
+            PlannedKind::Expense => {
+                let earlier = expense_total;
+                expense_total = add(expense_total, item.amount.hundredths())?;
+                let allocated = (expense_pool - earlier)
+                    .max(0)
+                    .min(item.amount.hundredths());
+                (
+                    allocated,
+                    (expense_total - expense_pool).max(0),
+                    &mut expense_rate,
+                )
+            }
         };
-        let earlier = *total;
-        *total = add(*total, item.amount.hundredths())?;
-        let allocated = (pool - earlier).max(0).min(item.amount.hundredths());
-        let remaining = (*total - pool).max(0);
         let days = i64::from(as_of.days_until(item.date)).max(0);
         let needed = if remaining == 0 {
             Some(0)
@@ -658,6 +674,11 @@ mod tests {
             date: state.start_date,
             amount: amount(70_000),
         });
+        state.plans[0].savings = amount(30_000);
+        state
+            .financial_metadata
+            .goal_allocations
+            .insert("target".into(), 30_000);
         let day = state.start_date;
         crate::savings::reconcile(&mut state, day).expect("allocate savings");
         let result =
@@ -669,6 +690,10 @@ mod tests {
         );
         state.income[0].amount = amount(200_000);
         state.plans[0].savings = amount(100_000);
+        state
+            .financial_metadata
+            .goal_allocations
+            .insert("target".into(), 100_000);
         crate::savings::reconcile(&mut state, day).expect("allocate savings");
         let funded =
             forecast(&state, state.start_date, "target", Some(amount(1000))).expect("forecast");

@@ -307,6 +307,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             ? ''
             : amountInput(purchase.amount, language: widget.strings.language),
         initialCategory: purchase?.category ?? 'other',
+        initialUseSavings: purchase?.fundedBySavings ?? false,
+        allowSavings: !(purchase?.fundedByGoal ?? false),
         onSave: (value) async {
           final accepted = await widget.run(() {
             if (purchase == null) {
@@ -316,6 +318,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                 description: value.description,
                 amount: value.amount,
                 category: value.category,
+                useSavings: value.useSavings,
               );
             }
             return widget.bridge.editPurchase(
@@ -324,6 +327,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               description: value.description,
               amount: value.amount,
               category: value.category,
+              useSavings: value.useSavings,
             );
           });
           if (accepted) savedValues = value;
@@ -351,6 +355,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
               amount: parseMoneyEntry(value.amount)!,
               category: value.category,
               fundedByGoal: purchase?.fundedByGoal ?? false,
+              fundedBySavings: value.useSavings,
             ),
           ),
         ),

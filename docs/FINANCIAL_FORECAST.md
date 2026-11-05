@@ -10,7 +10,7 @@ Personal Forecast places a named period selector at the top, defaulting to the a
 
 Historical periods show actual spending, planned minimum savings, actual period savings contributions, and closing balances. An optional target projection is explicitly a scenario from that historical closing date. It does not rewrite history.
 
-Daily discretionary spending uses observed purchases per elapsed day, or the Rust-funded recommendation when there is no spending history. Linked bill/goal payments are excluded from discretionary spending. Existing allocations are shared once in deadline/ID order, and reservations remain distinct from actual payments.
+Daily discretionary spending uses observed purchases per elapsed day, or the Rust-funded recommendation when there is no spending history. Linked bill/goal payments are excluded from discretionary spending. Goal progress uses the amount explicitly assigned by the user; expense reservations remain distinct from actual payments.
 
 Opening free cash is available once during the remaining horizon. Projections beyond that horizon assume a similar rate of actually received period income, unchanged spending and commitments, and no repeated opening balance. A missing expected payment creates no income. Insufficient capacity produces an unavailable completion estimate rather than invented money.
 

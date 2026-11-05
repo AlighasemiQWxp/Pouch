@@ -258,6 +258,10 @@ fn canada_uses_remaining_allocation_and_leaves_financial_state_unchanged() {
     });
     let today = date("2024-01-01");
     crate::savings::reconcile(&mut state, today).expect("savings");
+    state
+        .financial_metadata
+        .goal_allocations
+        .insert("target".into(), 30_000);
     let personal =
         crate::forecast::forecast(&state, today, "target", None).expect("personal forecast");
     assert!(personal.allocated > 0);

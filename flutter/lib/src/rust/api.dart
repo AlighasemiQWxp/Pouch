@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_exchange_rate`, `parse_language`, `parse_planned_kind`, `parse_recurrence`, `parse_week_start`, `period_snapshot`, `plan_snapshot`, `planned_kind_name`, `planned_snapshot_at`, `planned_snapshot`, `planned_status_name`, `recurrence_days`, `recurrence_name`, `report_snapshot`, `snapshot`, `week_start_number`
+// These functions are ignored because they are not marked as `pub`: `calendar_name`, `category_name`, `country_name`, `currency_name`, `language_name`, `parse_amount`, `parse_calendar`, `parse_category`, `parse_country`, `parse_currency`, `parse_date`, `parse_exchange_rate`, `parse_language`, `parse_planned_kind`, `parse_recurrence`, `parse_week_start`, `period_snapshot`, `plan_snapshot`, `planned_kind_name`, `planned_snapshot_at`, `planned_snapshot`, `planned_status_name`, `recurrence_days`, `recurrence_name`, `report_snapshot`, `set_income_label`, `set_savings_purchase`, `snapshot`, `validate_savings_purchase`, `week_start_number`
 
 Future<String> economicCountries() =>
     RustLib.instance.api.crateApiEconomicCountries();
@@ -34,6 +34,7 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String description,
     required String amount,
     required String category,
+    required bool useSavings,
   });
 
   Future<BudgetSnapshot> budgetSummary({
@@ -77,6 +78,7 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String description,
     required String amount,
     required String category,
+    required bool useSavings,
   });
 
   Future<String> exportBackup();
@@ -181,6 +183,7 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String kind,
     required String date,
     String? periodId,
+    String? allocated,
   });
 
   Future<AppSnapshot> scheduleIncome({
@@ -219,6 +222,7 @@ abstract class PouchApp implements RustOpaqueInterface {
     required String date,
     required String amount,
     String? periodId,
+    String? label,
   });
 
   Future<AppSnapshot> updatePreferences({
@@ -720,12 +724,14 @@ class IncomeDaySnapshot {
 }
 
 class IncomeSnapshot {
+  final String? label;
   final String? periodId;
   final String id;
   final String date;
   final int amount;
 
   const IncomeSnapshot({
+    this.label,
     this.periodId,
     required this.id,
     required this.date,
@@ -734,13 +740,18 @@ class IncomeSnapshot {
 
   @override
   int get hashCode =>
-      periodId.hashCode ^ id.hashCode ^ date.hashCode ^ amount.hashCode;
+      label.hashCode ^
+      periodId.hashCode ^
+      id.hashCode ^
+      date.hashCode ^
+      amount.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is IncomeSnapshot &&
           runtimeType == other.runtimeType &&
+          label == other.label &&
           periodId == other.periodId &&
           id == other.id &&
           date == other.date &&
@@ -925,6 +936,7 @@ class PlannedReportSnapshot {
 }
 
 class PlannedSnapshot {
+  final int allocated;
   final String? periodId;
   final String id;
   final String description;
@@ -938,6 +950,7 @@ class PlannedSnapshot {
   final String? essentialId;
 
   const PlannedSnapshot({
+    required this.allocated,
     this.periodId,
     required this.id,
     required this.description,
@@ -953,6 +966,7 @@ class PlannedSnapshot {
 
   @override
   int get hashCode =>
+      allocated.hashCode ^
       periodId.hashCode ^
       id.hashCode ^
       description.hashCode ^
@@ -970,6 +984,7 @@ class PlannedSnapshot {
       identical(this, other) ||
       other is PlannedSnapshot &&
           runtimeType == other.runtimeType &&
+          allocated == other.allocated &&
           periodId == other.periodId &&
           id == other.id &&
           description == other.description &&
@@ -1019,6 +1034,7 @@ class PreferencesSnapshot {
 }
 
 class PurchaseSnapshot {
+  final bool fundedBySavings;
   final String id;
   final String description;
   final int amount;
@@ -1026,6 +1042,7 @@ class PurchaseSnapshot {
   final bool fundedByGoal;
 
   const PurchaseSnapshot({
+    required this.fundedBySavings,
     required this.id,
     required this.description,
     required this.amount,
@@ -1035,6 +1052,7 @@ class PurchaseSnapshot {
 
   @override
   int get hashCode =>
+      fundedBySavings.hashCode ^
       id.hashCode ^
       description.hashCode ^
       amount.hashCode ^
@@ -1046,6 +1064,7 @@ class PurchaseSnapshot {
       identical(this, other) ||
       other is PurchaseSnapshot &&
           runtimeType == other.runtimeType &&
+          fundedBySavings == other.fundedBySavings &&
           id == other.id &&
           description == other.description &&
           amount == other.amount &&
@@ -1063,6 +1082,7 @@ class ReceiveIncomeRequest {
   final int customDays;
   final String? through;
   final bool expected;
+  final String? label;
 
   const ReceiveIncomeRequest({
     required this.id,
@@ -1074,6 +1094,7 @@ class ReceiveIncomeRequest {
     required this.customDays,
     this.through,
     required this.expected,
+    this.label,
   });
 
   @override
@@ -1086,7 +1107,8 @@ class ReceiveIncomeRequest {
       kind.hashCode ^
       customDays.hashCode ^
       through.hashCode ^
-      expected.hashCode;
+      expected.hashCode ^
+      label.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1101,7 +1123,8 @@ class ReceiveIncomeRequest {
           kind == other.kind &&
           customDays == other.customDays &&
           through == other.through &&
-          expected == other.expected;
+          expected == other.expected &&
+          label == other.label;
 }
 
 class ReportEntrySnapshot {

@@ -75,6 +75,7 @@ pub fn remove_planned(state: &mut AppState, id: &str) -> PouchResult<()> {
     }
     state.planned.remove(index);
     state.period_context.planned.remove(id);
+    state.financial_metadata.goal_allocations.remove(id);
     Ok(())
 }
 

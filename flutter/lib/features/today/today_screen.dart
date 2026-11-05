@@ -466,6 +466,44 @@ class _TodayScreenState extends State<TodayScreen> {
               );
             },
           ),
+        const SizedBox(height: 16),
+        FutureBuilder<PouchBudgetSummary>(
+          future: summary,
+          builder: (context, result) {
+            if (!result.hasData) return const SizedBox.shrink();
+            final value = result.data!;
+            return PouchCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(t.text('totalRemainingBalance')),
+                  Text(
+                    money(value.funds + value.savings),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  FutureBuilder<PouchBudgetSummary>(
+                    future: widget.bridge.budgetSummary(
+                      DateTime.parse('${value.date}T00:00:00Z')
+                          .add(const Duration(days: 1))
+                          .toIso8601String()
+                          .substring(0, 10),
+                    ),
+                    builder: (context, tomorrow) {
+                      if (!tomorrow.hasData) return const SizedBox.shrink();
+                      if (tomorrow.data!.daysRemaining == 0) {
+                        return Text(t.text('tomorrowUnavailable'));
+                      }
+                      return PouchSummaryRow(
+                        label: t.text('tomorrowAvailable'),
+                        value: money(tomorrow.data!.recommendation),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ],
     );
   }

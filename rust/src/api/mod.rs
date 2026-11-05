@@ -145,12 +145,17 @@ impl PouchApp {
         description: String,
         amount: String,
         category: String,
+        use_savings: bool,
     ) -> Result<AppSnapshot, String> {
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
         let category = parse_category(&category)?;
         self.core
-            .apply(|state| crate::purchases::add(state, id, date, description, amount, category))
+            .apply(|state| {
+                validate_savings_purchase(state, date, &id, amount, use_savings)?;
+                crate::purchases::add(state, id.clone(), date, description, amount, category)?;
+                set_savings_purchase(state, date, &id, use_savings)
+            })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
     }
@@ -162,12 +167,17 @@ impl PouchApp {
         description: String,
         amount: String,
         category: String,
+        use_savings: bool,
     ) -> Result<AppSnapshot, String> {
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
         let category = parse_category(&category)?;
         self.core
-            .apply(|state| crate::purchases::edit(state, date, &id, description, amount, category))
+            .apply(|state| {
+                validate_savings_purchase(state, date, &id, amount, use_savings)?;
+                crate::purchases::edit(state, date, &id, description, amount, category)?;
+                set_savings_purchase(state, date, &id, use_savings)
+            })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
     }
@@ -186,12 +196,14 @@ impl PouchApp {
         date: String,
         amount: String,
         period_id: Option<String>,
+        label: Option<String>,
     ) -> Result<AppSnapshot, String> {
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
         self.core
             .apply(|state| {
                 crate::income::edit(state, &id, date, amount)?;
+                set_income_label(state, &id, label)?;
                 if let Some(period_id) = period_id {
                     crate::periods::context::assign_income(state, &id, &period_id)?;
                 }
@@ -300,6 +312,11 @@ impl PouchApp {
             })
             .map(|item| {
                 Ok(IncomeSnapshot {
+                    label: state
+                        .financial_metadata
+                        .income_labels
+                        .get(&item.id)
+                        .cloned(),
                     id: item.id.clone(),
                     date: item.date.iso().map_err(|error| error.to_string())?,
                     amount: item.amount.hundredths(),
@@ -418,6 +435,7 @@ impl PouchApp {
             custom_days,
             through,
             expected,
+            label,
         } = receipt;
         let date = parse_date(&date)?;
         let amount = parse_amount(&amount)?;
@@ -438,13 +456,14 @@ impl PouchApp {
             .apply(|state| {
                 crate::income::receive(
                     state,
-                    id,
+                    id.clone(),
                     date,
                     amount,
                     period_id.as_deref(),
                     new_period,
                     expected,
-                )
+                )?;
+                set_income_label(state, &id, label)
             })
             .map_err(|error| error.to_string())?;
         snapshot(&self.core)
@@ -504,6 +523,7 @@ impl PouchApp {
         kind: String,
         date: String,
         period_id: Option<String>,
+        allocated: Option<String>,
     ) -> Result<AppSnapshot, String> {
         let item = crate::expenses::create_planned(
             id,
@@ -514,8 +534,34 @@ impl PouchApp {
             parse_date(&date)?,
         );
         let item_id = item.id.clone();
+        let allocation = allocated.as_deref().map(parse_amount).transpose()?;
         self.core
             .apply(|state| {
+                if item.kind == PlannedKind::Goal {
+                    let selected = allocation.map(Money::hundredths).unwrap_or(0);
+                    let today = Date::from_naive_date(chrono::Local::now().date_naive())?;
+                    let other = state
+                        .financial_metadata
+                        .goal_allocations
+                        .iter()
+                        .filter(|(id, _)| *id != &item_id)
+                        .filter(|(id, _)| {
+                            state.planned.iter().any(|goal| {
+                                &goal.id == *id && goal.status == PlannedStatus::Pending
+                            })
+                        })
+                        .try_fold(0, |sum, (_, amount)| crate::budget::total(sum, *amount))?;
+                    if selected > item.amount.hundredths()
+                        || crate::budget::total(other, selected)?
+                            > crate::savings::balance(state, today)?
+                    {
+                        return Err(crate::PouchError::InvalidEntry);
+                    }
+                    state
+                        .financial_metadata
+                        .goal_allocations
+                        .insert(item_id.clone(), selected);
+                }
                 crate::expenses::save_planned(state, item)?;
                 if let Some(period_id) = period_id {
                     crate::periods::context::assign_planned(state, &item_id, &period_id)?;
@@ -544,6 +590,21 @@ impl PouchApp {
         let amount = parse_amount(&amount)?;
         self.core
             .apply(|state| {
+                if state
+                    .planned
+                    .iter()
+                    .any(|item| item.id == plan_id && item.kind == PlannedKind::Goal)
+                {
+                    let assigned = state
+                        .financial_metadata
+                        .goal_allocations
+                        .get(&plan_id)
+                        .copied()
+                        .unwrap_or(0);
+                    if amount.hundredths() > assigned {
+                        return Err(crate::PouchError::InvalidEntry);
+                    }
+                }
                 crate::expenses::mark_paid(state, &plan_id, purchase_id, paid_date, amount)
             })
             .map_err(|error| error.to_string())?;
@@ -787,6 +848,79 @@ impl PouchApp {
     }
 }
 
+fn validate_savings_purchase(
+    state: &AppState,
+    date: Date,
+    id: &str,
+    amount: Money,
+    use_savings: bool,
+) -> crate::PouchResult<()> {
+    if !use_savings {
+        return Ok(());
+    }
+    let mut available = crate::savings::balance(state, date)?;
+    let key = crate::savings::purchase_key(date, id);
+    if state.financial_metadata.savings_purchases.contains(&key)
+        && let Some(old) = state
+            .days
+            .get(&date)
+            .and_then(|day| day.purchases.iter().find(|p| p.id == id))
+    {
+        available = crate::budget::total(available, old.amount.hundredths())?;
+    }
+    let assigned = state
+        .financial_metadata
+        .goal_allocations
+        .iter()
+        .filter(|(id, _)| {
+            state
+                .planned
+                .iter()
+                .any(|item| &item.id == *id && item.status == PlannedStatus::Pending)
+        })
+        .try_fold(0, |sum, (_, amount)| crate::budget::total(sum, *amount))?;
+    if amount.hundredths() > (available - assigned).max(0) {
+        return Err(crate::PouchError::InvalidEntry);
+    }
+    Ok(())
+}
+
+fn set_savings_purchase(
+    state: &mut AppState,
+    date: Date,
+    id: &str,
+    use_savings: bool,
+) -> crate::PouchResult<()> {
+    let key = crate::savings::purchase_key(date, id);
+    if use_savings {
+        state.financial_metadata.savings_purchases.insert(key);
+    } else {
+        state.financial_metadata.savings_purchases.remove(&key);
+    }
+    crate::savings::reconcile(state, date)
+}
+
+fn set_income_label(
+    state: &mut AppState,
+    id: &str,
+    label: Option<String>,
+) -> crate::PouchResult<()> {
+    let label = label.unwrap_or_default();
+    let label = label.trim();
+    if label.encode_utf16().count() > 120 {
+        return Err(crate::PouchError::InvalidEntry);
+    }
+    if label.is_empty() {
+        state.financial_metadata.income_labels.remove(id);
+    } else {
+        state
+            .financial_metadata
+            .income_labels
+            .insert(id.to_owned(), label.to_owned());
+    }
+    Ok(())
+}
+
 pub fn economic_countries() -> Result<String, String> {
     serde_json::to_string(&crate::economics::COUNTRIES).map_err(|_| "invalid_country".into())
 }
@@ -863,6 +997,7 @@ pub struct PreferencesSnapshot {
 }
 
 pub struct IncomeSnapshot {
+    pub label: Option<String>,
     pub period_id: Option<String>,
     pub id: String,
     pub date: String,
@@ -925,6 +1060,7 @@ pub struct ReceiveIncomeRequest {
     pub custom_days: u16,
     pub through: Option<String>,
     pub expected: bool,
+    pub label: Option<String>,
 }
 
 pub struct PeriodViewSnapshot {
@@ -946,6 +1082,7 @@ pub struct IncomeDaySnapshot {
 }
 
 pub struct PurchaseSnapshot {
+    pub funded_by_savings: bool,
     pub id: String,
     pub description: String,
     pub amount: i64,
@@ -959,6 +1096,7 @@ pub struct DaySnapshot {
 }
 
 pub struct PlannedSnapshot {
+    pub allocated: i64,
     pub period_id: Option<String>,
     pub id: String,
     pub description: String,
@@ -1157,6 +1295,11 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
         .iter()
         .map(|entry| {
             Ok(IncomeSnapshot {
+                label: state
+                    .financial_metadata
+                    .income_labels
+                    .get(&entry.id)
+                    .cloned(),
                 id: entry.id.clone(),
                 date: entry.date.iso().map_err(|error| error.to_string())?,
                 amount: entry.amount.hundredths(),
@@ -1244,6 +1387,10 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
                     .purchases
                     .iter()
                     .map(|purchase| PurchaseSnapshot {
+                        funded_by_savings: state
+                            .financial_metadata
+                            .savings_purchases
+                            .contains(&crate::savings::purchase_key(*date, &purchase.id)),
                         id: purchase.id.clone(),
                         description: purchase.description.clone(),
                         amount: purchase.amount.hundredths(),
@@ -1288,6 +1435,12 @@ fn snapshot(core: &PouchCore) -> Result<AppSnapshot, String> {
 
 fn planned_snapshot(state: &AppState, item: &PlannedItem) -> Result<PlannedSnapshot, String> {
     Ok(PlannedSnapshot {
+        allocated: state
+            .financial_metadata
+            .goal_allocations
+            .get(&item.id)
+            .copied()
+            .unwrap_or(0),
         id: item.id.clone(),
         description: item.description.clone(),
         amount: item.amount.hundredths(),

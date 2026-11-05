@@ -2,7 +2,7 @@
 
 set -e
 
-BASEDIR=$(dirname "$0")
+BASEDIR=$(cd -- "$(dirname -- "$0")" && pwd -P)
 
 mkdir -p "$CARGOKIT_TOOL_TEMP_DIR"
 

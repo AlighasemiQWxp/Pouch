@@ -174,7 +174,13 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
         .get(&date)
         .into_iter()
         .flat_map(|day| &day.purchases)
-        .filter(|purchase| !linked.contains(purchase.id.as_str()))
+        .filter(|purchase| {
+            !linked.contains(purchase.id.as_str())
+                && !state
+                    .financial_metadata
+                    .savings_purchases
+                    .contains(&crate::savings::purchase_key(date, &purchase.id))
+        })
         .try_fold(0, |sum, item| total(sum, item.amount.hundredths()))?;
     let daily = if count > 0 {
         total(funding.free, discretionary)?

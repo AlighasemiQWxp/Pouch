@@ -129,6 +129,8 @@ impl CoreModules {
 
     fn commit(&mut self, mut next: AppState) -> PouchResult<u64> {
         next.validate()?;
+        let today = Date::from_naive_date(chrono::Local::now().date_naive())?;
+        crate::savings::validate_goal_assignments(&next, today)?;
         crate::periods::context::synchronize(&mut next);
         let revision = self
             .revision

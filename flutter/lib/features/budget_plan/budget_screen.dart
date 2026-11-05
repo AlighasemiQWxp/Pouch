@@ -50,6 +50,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   late final TextEditingController _savings = TextEditingController();
   late final TextEditingController _incomeAmount = TextEditingController();
+  late final TextEditingController _incomeLabel = TextEditingController();
   PouchPeriodView? _periodView;
   late String _planDate = widget.today;
   int _periodRequest = 0;
@@ -162,6 +163,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   void dispose() {
     _savings.dispose();
     _incomeAmount.dispose();
+    _incomeLabel.dispose();
     super.dispose();
   }
 
@@ -213,6 +215,21 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          if (!expected) ...[
+            TextField(
+              key: const ValueKey('income-label'),
+              controller: _incomeLabel,
+              maxLength: 120,
+              decoration: InputDecoration(labelText: t.text('incomeLabel')),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ActionChip(
+                label: Text(t.text('salary')),
+                onPressed: () => _incomeLabel.text = t.text('salary'),
+              ),
+            ),
+          ],
           PouchPrimaryButton(
             key: _incomeButton,
             label: t.text(editing ? 'saveIncome' : 'addIncome'),
@@ -289,6 +306,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 Text(t.text('savingsHint')),
                 const SizedBox(height: 16),
                 TextField(
+                  key: const ValueKey('savings-amount'),
                   controller: _savings,
                   inputFormatters: [PouchMoneyInputFormatter(t.language)],
                   keyboardType: const TextInputType.numberWithOptions(
@@ -424,7 +442,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.south_west_rounded),
-                    title: Text(_money(item.amount)),
+                    title: Text(
+                      item.label == null || item.label!.isEmpty
+                          ? _money(item.amount)
+                          : '${item.label} · ${_money(item.amount)}',
+                    ),
                     subtitle: PouchDateLabel(
                       bridge: widget.bridge,
                       strings: t,
@@ -688,9 +710,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             if (incomeAmount != null && incomeAmount > 0) ...[
                               const SizedBox(height: 1),
                               Text(
-                                widget.strings.text(
-                                  expected == null ? 'salary' : 'expectedShort',
-                                ),
+                                income
+                                    .where((item) => item.date == date)
+                                    .map(
+                                      (item) => item.label?.isNotEmpty == true
+                                          ? item.label!
+                                          : widget.strings.text('salary'),
+                                    )
+                                    .toSet()
+                                    .join(', '),
                                 maxLines: 1,
                                 overflow: TextOverflow.clip,
                                 style: TextStyle(
@@ -962,6 +990,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       );
       if (accepted && mounted) {
         _incomeAmount.clear();
+        _incomeLabel.clear();
         await _selectPeriod(
           widget.snapshot.periods
               .firstWhere((period) => period.id == periodId)
@@ -985,6 +1014,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           date: _incomeDate,
           amount: _incomeAmount.text.trim(),
           periodId: periodId,
+          label: _incomeLabel.text.trim(),
         );
       }
       if (_incomeDate.compareTo(widget.today) > 0) {
@@ -1021,6 +1051,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       _editingIncomeId = income.id;
       _editingExpectedIncomeId = null;
       _incomeDate = income.date;
+      _incomeLabel.text = income.label ?? '';
       _incomeAmount.text = amountInput(
         income.amount,
         language: widget.strings.language,
@@ -1215,6 +1246,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         periodId: period.id,
         startNew: false,
         expected: expected,
+        label: _incomeLabel.text.trim(),
       ),
     );
     if (accepted && mounted) {

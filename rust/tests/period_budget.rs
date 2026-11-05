@@ -635,7 +635,7 @@ fn deleting_a_savings_revision_keeps_goal_funding() {
     )
     .unwrap();
     budget::remove_plan(&mut state, day("2024-10-10")).unwrap();
-    assert_eq!(savings::balance(&state, day("2024-10-10")).unwrap(), 400);
+    assert_eq!(savings::balance(&state, day("2024-10-10")).unwrap(), 0);
     assert_eq!(state.planned.len(), 1);
     state.validate().unwrap();
 }
@@ -762,12 +762,12 @@ fn long_term_goal_contribution_is_not_repeated_on_later_days() {
     for offset in 0..31 {
         let date = day("2024-10-10").add_days(offset).unwrap();
         savings::reconcile(&mut state, date).unwrap();
-        assert_eq!(savings::balance(&state, date).unwrap(), 3100);
+        assert_eq!(savings::balance(&state, date).unwrap(), 0);
         let before = state.clone();
         savings::reconcile(&mut state, date).unwrap();
         assert_eq!(state, before);
     }
-    assert_eq!(state.allocations.len(), 1);
+    assert_eq!(state.allocations.len(), 0);
     assert!(
         budget::recommend(&state, day("2024-10-21"))
             .unwrap()
@@ -853,8 +853,8 @@ fn rollover_credits_opening_savings_before_funding_the_next_period() {
     for offset in 0..31 {
         let date = day("2024-11-10").add_days(offset).unwrap();
         savings::reconcile(&mut state, date).unwrap();
-        assert_eq!(savings::balance(&state, date).unwrap(), 6200);
-        assert_eq!(budget::funding(&state, date).unwrap().free, 3800);
+        assert_eq!(savings::balance(&state, date).unwrap(), 0);
+        assert_eq!(budget::funding(&state, date).unwrap().free, 10_000);
     }
     assert_eq!(state.income.len(), 1);
 }
@@ -890,8 +890,8 @@ fn paying_a_goal_does_not_repeat_the_remaining_goals_contribution() {
         let date = day("2024-10-10").add_days(offset).unwrap();
         savings::reconcile(&mut state, date).unwrap();
         let funding = budget::funding(&state, date).unwrap();
-        assert_eq!(funding.savings, 3100);
-        assert_eq!(funding.free, 5900);
+        assert_eq!(funding.savings, 0);
+        assert_eq!(funding.free, 9000);
         assert_eq!(
             funding.cash,
             funding.free + funding.reserved + funding.savings
@@ -916,12 +916,12 @@ fn goal_reservation_recovers_after_cash_shortage_without_accumulating_again() {
     )
     .unwrap();
     savings::reconcile(&mut state, day("2024-10-10")).unwrap();
-    assert_eq!(savings::balance(&state, day("2024-10-10")).unwrap(), 1000);
+    assert_eq!(savings::balance(&state, day("2024-10-10")).unwrap(), 0);
     receive(&mut state, "extra", "2024-10-11", 9000);
     for offset in 1..10 {
         let date = day("2024-10-10").add_days(offset).unwrap();
         savings::reconcile(&mut state, date).unwrap();
-        assert_eq!(savings::balance(&state, date).unwrap(), 3100);
+        assert_eq!(savings::balance(&state, date).unwrap(), 0);
     }
 }
 

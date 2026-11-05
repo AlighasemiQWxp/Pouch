@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 3.2.0
+
+- Record optional income labels and show them in the Budget calendar.
+- Choose savings as the funding source for daily expenses and explicitly assign existing savings to goals.
+- Stop goals from automatically increasing savings; repair previously derived allocations when upgrading or restoring older data.
+- Show total cash and tomorrow’s estimated allowance on Today.
+
 ## 3.1.0
 
 - Add an offline spending dashboard with income, spending, balance, bill, and savings views and date-range filters.

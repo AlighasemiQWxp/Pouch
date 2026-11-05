@@ -71,6 +71,10 @@ pub fn remove(state: &mut AppState, date: Date, id: &str) -> PouchResult<()> {
     if day.purchases.len() == original_length {
         return Err(PouchError::InvalidEntry);
     }
+    state
+        .financial_metadata
+        .savings_purchases
+        .remove(&crate::savings::purchase_key(date, id));
     for planned in &mut state.planned {
         if planned.status == PlannedStatus::Paid
             && planned.paid_date == Some(date)

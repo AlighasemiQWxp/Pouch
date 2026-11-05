@@ -78,6 +78,7 @@ fn wire__crate__api__PouchApp_add_purchase_impl(
             let api_description = <String>::sse_decode(&mut deserializer);
             let api_amount = <String>::sse_decode(&mut deserializer);
             let api_category = <String>::sse_decode(&mut deserializer);
+            let api_use_savings = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -102,6 +103,7 @@ fn wire__crate__api__PouchApp_add_purchase_impl(
                         api_description,
                         api_amount,
                         api_category,
+                        api_use_savings,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -526,6 +528,7 @@ fn wire__crate__api__PouchApp_edit_purchase_impl(
             let api_description = <String>::sse_decode(&mut deserializer);
             let api_amount = <String>::sse_decode(&mut deserializer);
             let api_category = <String>::sse_decode(&mut deserializer);
+            let api_use_savings = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -550,6 +553,7 @@ fn wire__crate__api__PouchApp_edit_purchase_impl(
                         api_description,
                         api_amount,
                         api_category,
+                        api_use_savings,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -1858,6 +1862,7 @@ fn wire__crate__api__PouchApp_save_planned_impl(
             let api_kind = <String>::sse_decode(&mut deserializer);
             let api_date = <String>::sse_decode(&mut deserializer);
             let api_period_id = <Option<String>>::sse_decode(&mut deserializer);
+            let api_allocated = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -1884,6 +1889,7 @@ fn wire__crate__api__PouchApp_save_planned_impl(
                         api_kind,
                         api_date,
                         api_period_id,
+                        api_allocated,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -2297,6 +2303,7 @@ fn wire__crate__api__PouchApp_update_income_impl(
             let api_date = <String>::sse_decode(&mut deserializer);
             let api_amount = <String>::sse_decode(&mut deserializer);
             let api_period_id = <Option<String>>::sse_decode(&mut deserializer);
+            let api_label = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, String>((move || {
@@ -2320,6 +2327,7 @@ fn wire__crate__api__PouchApp_update_income_impl(
                         api_date,
                         api_amount,
                         api_period_id,
+                        api_label,
                     )?;
                     std::result::Result::Ok(output_ok)
                 })())
@@ -2820,11 +2828,13 @@ impl SseDecode for crate::api::IncomeDaySnapshot {
 impl SseDecode for crate::api::IncomeSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_label = <Option<String>>::sse_decode(deserializer);
         let mut var_periodId = <Option<String>>::sse_decode(deserializer);
         let mut var_id = <String>::sse_decode(deserializer);
         let mut var_date = <String>::sse_decode(deserializer);
         let mut var_amount = <i64>::sse_decode(deserializer);
         return crate::api::IncomeSnapshot {
+            label: var_label,
             period_id: var_periodId,
             id: var_id,
             date: var_date,
@@ -3171,6 +3181,7 @@ impl SseDecode for crate::api::PlannedReportSnapshot {
 impl SseDecode for crate::api::PlannedSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_allocated = <i64>::sse_decode(deserializer);
         let mut var_periodId = <Option<String>>::sse_decode(deserializer);
         let mut var_id = <String>::sse_decode(deserializer);
         let mut var_description = <String>::sse_decode(deserializer);
@@ -3183,6 +3194,7 @@ impl SseDecode for crate::api::PlannedSnapshot {
         let mut var_purchaseId = <Option<String>>::sse_decode(deserializer);
         let mut var_essentialId = <Option<String>>::sse_decode(deserializer);
         return crate::api::PlannedSnapshot {
+            allocated: var_allocated,
             period_id: var_periodId,
             id: var_id,
             description: var_description,
@@ -3219,12 +3231,14 @@ impl SseDecode for crate::api::PreferencesSnapshot {
 impl SseDecode for crate::api::PurchaseSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_fundedBySavings = <bool>::sse_decode(deserializer);
         let mut var_id = <String>::sse_decode(deserializer);
         let mut var_description = <String>::sse_decode(deserializer);
         let mut var_amount = <i64>::sse_decode(deserializer);
         let mut var_category = <String>::sse_decode(deserializer);
         let mut var_fundedByGoal = <bool>::sse_decode(deserializer);
         return crate::api::PurchaseSnapshot {
+            funded_by_savings: var_fundedBySavings,
             id: var_id,
             description: var_description,
             amount: var_amount,
@@ -3246,6 +3260,7 @@ impl SseDecode for crate::api::ReceiveIncomeRequest {
         let mut var_customDays = <u16>::sse_decode(deserializer);
         let mut var_through = <Option<String>>::sse_decode(deserializer);
         let mut var_expected = <bool>::sse_decode(deserializer);
+        let mut var_label = <Option<String>>::sse_decode(deserializer);
         return crate::api::ReceiveIncomeRequest {
             id: var_id,
             date: var_date,
@@ -3256,6 +3271,7 @@ impl SseDecode for crate::api::ReceiveIncomeRequest {
             custom_days: var_customDays,
             through: var_through,
             expected: var_expected,
+            label: var_label,
         };
     }
 }
@@ -3780,6 +3796,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::IncomeDaySnapshot>
 impl flutter_rust_bridge::IntoDart for crate::api::IncomeSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.label.into_into_dart().into_dart(),
             self.period_id.into_into_dart().into_dart(),
             self.id.into_into_dart().into_dart(),
             self.date.into_into_dart().into_dart(),
@@ -3883,6 +3900,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::PlannedReportSnapshot>
 impl flutter_rust_bridge::IntoDart for crate::api::PlannedSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.allocated.into_into_dart().into_dart(),
             self.period_id.into_into_dart().into_dart(),
             self.id.into_into_dart().into_dart(),
             self.description.into_into_dart().into_dart(),
@@ -3934,6 +3952,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::PreferencesSnapshot>
 impl flutter_rust_bridge::IntoDart for crate::api::PurchaseSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
+            self.funded_by_savings.into_into_dart().into_dart(),
             self.id.into_into_dart().into_dart(),
             self.description.into_into_dart().into_dart(),
             self.amount.into_into_dart().into_dart(),
@@ -3964,6 +3983,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::ReceiveIncomeRequest {
             self.custom_days.into_into_dart().into_dart(),
             self.through.into_into_dart().into_dart(),
             self.expected.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4257,6 +4277,7 @@ impl SseEncode for crate::api::IncomeDaySnapshot {
 impl SseEncode for crate::api::IncomeSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<String>>::sse_encode(self.label, serializer);
         <Option<String>>::sse_encode(self.period_id, serializer);
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.date, serializer);
@@ -4518,6 +4539,7 @@ impl SseEncode for crate::api::PlannedReportSnapshot {
 impl SseEncode for crate::api::PlannedSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i64>::sse_encode(self.allocated, serializer);
         <Option<String>>::sse_encode(self.period_id, serializer);
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.description, serializer);
@@ -4546,6 +4568,7 @@ impl SseEncode for crate::api::PreferencesSnapshot {
 impl SseEncode for crate::api::PurchaseSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.funded_by_savings, serializer);
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.description, serializer);
         <i64>::sse_encode(self.amount, serializer);
@@ -4566,6 +4589,7 @@ impl SseEncode for crate::api::ReceiveIncomeRequest {
         <u16>::sse_encode(self.custom_days, serializer);
         <Option<String>>::sse_encode(self.through, serializer);
         <bool>::sse_encode(self.expected, serializer);
+        <Option<String>>::sse_encode(self.label, serializer);
     }
 }
 
