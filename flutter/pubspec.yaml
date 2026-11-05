@@ -1,7 +1,7 @@
 name: pouch
 description: "Pouch offline budget planner"
 publish_to: 'none'
-version: 3.2.0+8
+version: 3.2.1+9
 
 environment:
   sdk: ^3.13.2

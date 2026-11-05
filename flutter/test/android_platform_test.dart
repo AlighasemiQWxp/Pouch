@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pouch/core/pouch_platform.dart';
+import 'package:pouch/core/pouch_runtime.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +35,23 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
+  });
+
+  test('Android loads the packaged Rust library by its actual name', () {
+    expect(
+      pouchCoreLibraryPath('android', '/system/bin/app_process64'),
+      'libpouch_core.so',
+    );
+    final directory = Directory.current.path;
+    final executable = '$directory${Platform.pathSeparator}pouch';
+    expect(
+      pouchCoreLibraryPath('linux', executable),
+      '$directory/lib/libpouch_core.so',
+    );
+    expect(
+      pouchCoreLibraryPath('windows', executable),
+      '$directory/pouch_core.dll',
+    );
   });
 
   test(

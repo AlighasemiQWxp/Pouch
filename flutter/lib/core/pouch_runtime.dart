@@ -4,18 +4,21 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show ExternalLibrary;
 import 'package:pouch/src/rust/frb_generated.dart';
 
+String? pouchCoreLibraryPath(String operatingSystem, String executable) {
+  if (operatingSystem == 'android') return 'libpouch_core.so';
+  final directory = File(executable).parent.path;
+  if (operatingSystem == 'windows') return '$directory/pouch_core.dll';
+  if (operatingSystem == 'linux') return '$directory/lib/libpouch_core.so';
+  return null;
+}
+
 Future<void> initializePouchCore() async {
-  final directory = File(Platform.resolvedExecutable).parent.path;
-  if (Platform.isWindows) {
-    await RustLib.init(
-      externalLibrary: ExternalLibrary.open('$directory/pouch_core.dll'),
-    );
-    return;
-  }
-  if (Platform.isLinux) {
-    await RustLib.init(
-      externalLibrary: ExternalLibrary.open('$directory/lib/libpouch_core.so'),
-    );
+  final path = pouchCoreLibraryPath(
+    Platform.operatingSystem,
+    Platform.resolvedExecutable,
+  );
+  if (path != null) {
+    await RustLib.init(externalLibrary: ExternalLibrary.open(path));
     return;
   }
   await RustLib.init();
