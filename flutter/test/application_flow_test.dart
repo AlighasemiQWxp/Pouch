@@ -95,6 +95,7 @@ class TestBridge extends PouchBridge {
   int revision = 1;
   bool rejectPurchases = false;
   bool rejectPlans = false;
+  PouchBudgetSummary? summaryOverride;
 
   @override
   Future<PouchSnapshot> addPurchase({
@@ -317,6 +318,8 @@ class TestBridge extends PouchBridge {
   }) async {
     requestedDates.add(date);
     requestedPeriods.add(periodId);
+    final override = summaryOverride;
+    if (override != null) return override;
     return PouchBudgetSummary(
       date: date,
       periodEnd: '2024-01-14',
@@ -521,6 +524,54 @@ void main() {
       }
     },
   );
+  testWidgets('Today shows spendable money separately from savings and cash', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final bridge = TestBridge()
+      ..summaryOverride = const PouchBudgetSummary(
+        date: '2024-01-10',
+        periodEnd: '2024-01-14',
+        daysRemaining: 5,
+        carry: 0,
+        daily: 0,
+        spent: 0,
+        remaining: 12215470,
+        income: 0,
+        requiredExpenses: 0,
+        savings: 700000000,
+        funds: 12315470,
+        reserved: 100000,
+        recommendation: 0,
+        shortfall: 0,
+      );
+    await tester.pumpWidget(
+      PouchApplication(
+        bridge: bridge,
+        initialSnapshot: records(),
+        initialStrings: englishStrings,
+        initialToday: '2024-01-10',
+        initialThemeStyle: 'classic',
+      ),
+    );
+    await settleApp(tester);
+    final amount = find.byKey(const ValueKey('total-spendable-balance'));
+    await tester.ensureVisible(amount);
+    expect(
+      tester.widget<Text>(amount).data,
+      formatMoney(12215470, 'CAD', englishStrings),
+    );
+    expect(
+      find.text(formatMoney(700000000, 'CAD', englishStrings)),
+      findsWidgets,
+    );
+    expect(
+      find.text(formatMoney(712315470, 'CAD', englishStrings)),
+      findsWidgets,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('Daily purchases follow the chosen day across navigation', (
     tester,
   ) async {
@@ -1072,7 +1123,13 @@ void main() {
         await settleApp(tester);
         await tester.tap(details);
         await settleApp(tester);
-        expect(find.text(strings.text('protectedSavings')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('daily-budget-details')),
+            matching: find.text(strings.text('protectedSavings')),
+          ),
+          findsOneWidget,
+        );
         expect(find.text(strings.text('savingsSetAsideHint')), findsOneWidget);
         final add = find.text(strings.text('addPlannedExpense'));
         await Scrollable.ensureVisible(tester.element(add), alignment: 0.5);

@@ -2,11 +2,10 @@
 
 ## Unreleased
 
-## 3.2.1
+## 3.1.0 - build 10
 
 - Fix Android startup by loading the packaged Rust library by its correct name.
-
-## 3.2.0
+- Show available-to-spend funds separately from savings and total balance on Today.
 
 - Record optional income labels and show them in the Budget calendar.
 - Choose savings as the funding source for daily expenses and explicitly assign existing savings to goals.

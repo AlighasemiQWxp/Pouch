@@ -476,10 +476,19 @@ class _TodayScreenState extends State<TodayScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(t.text('totalRemainingBalance')),
+                  Text(t.text('freeToSpend')),
                   Text(
-                    money(value.funds + value.savings),
+                    money(value.remaining),
+                    key: const ValueKey('total-spendable-balance'),
                     style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  PouchSummaryRow(
+                    label: t.text('protectedSavings'),
+                    value: money(value.savings),
+                  ),
+                  PouchSummaryRow(
+                    label: t.text('totalRemainingBalance'),
+                    value: money(value.funds + value.savings),
                   ),
                   FutureBuilder<PouchBudgetSummary>(
                     future: widget.bridge.budgetSummary(
