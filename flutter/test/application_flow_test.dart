@@ -804,14 +804,16 @@ void main() {
         'A new $entry',
       );
       await tester.enterText(fields.at(entry == 'daily' ? 0 : 1), '10');
-      if (entry == 'daily')
+      if (entry == 'daily') {
         await tester.tap(find.text(englishStrings.text('payFromSavings')));
+      }
       await tester.tap(find.text(englishStrings.text('save')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(burst, findsOneWidget);
-      if (entry == 'daily')
+      if (entry == 'daily') {
         expect(bridge.purchases.values.single.single.fundedBySavings, isTrue);
+      }
       await settleApp(tester);
       expect(burst, findsNothing);
       final savedCount = entry == 'daily'
