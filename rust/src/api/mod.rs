@@ -106,18 +106,15 @@ impl PouchApp {
         date: String,
         period_id: Option<String>,
     ) -> Result<BudgetSnapshot, String> {
-        let date = parse_date(&date)?;
+        let mut date = parse_date(&date)?;
         let state = self.core.state();
-        let summary = if let Some(id) = period_id {
+        if let Some(id) = period_id {
             let period = crate::periods::find(state, &id).map_err(|error| error.to_string())?;
-            let date = date
+            date = date
                 .max(period.start)
                 .min(period.end.add_days(-1).map_err(|error| error.to_string())?);
-            crate::budget::recommend(state, date)
-        } else {
-            crate::budget::recommend_for_day(state, date)
         }
-        .map_err(|error| error.to_string())?;
+        let summary = crate::budget::recommend(state, date).map_err(|error| error.to_string())?;
         Ok(BudgetSnapshot {
             date: summary.date.iso().map_err(|error| error.to_string())?,
             period_end: summary
@@ -351,15 +348,7 @@ impl PouchApp {
         let obligations = crate::expenses::obligations(state, period.end)
             .map_err(|error| error.to_string())?
             .iter()
-            .filter(|item| {
-                item.kind == PlannedKind::Expense
-                    && crate::periods::context::planned_matches(state, item, &period.id)
-                    && (item.date < period.end
-                        || crate::periods::context::planned_period(state, item).is_some())
-                    && (item.date >= period.start
-                        || item.status == PlannedStatus::Pending
-                        || item.paid_date.is_some_and(|paid| paid > as_of))
-            })
+            .filter(|item| crate::budget::bill_due_in_period(state, item, &period))
             .map(|item| planned_snapshot_at(state, item, as_of))
             .collect::<Result<Vec<_>, String>>()?;
         Ok(PeriodViewSnapshot {

@@ -131,7 +131,19 @@ pub fn snapshot(
     if let Some(id) = &result.period_id {
         result.assigned_income = Some(budget::income_for_period(state, id, range.as_of)?);
     }
-    let funding = budget::funding(state, range.as_of)?;
+    let period = match result.period_id.as_deref() {
+        Some(id) => Some(crate::periods::find(state, id)?.clone()),
+        None => match crate::periods::at(state, range.as_of) {
+            Ok(period) => Some(period),
+            Err(crate::PouchError::MissingPeriod) => None,
+            Err(error) => return Err(error),
+        },
+    };
+    let bills = match &period {
+        Some(period) => budget::period_bills(state, range.as_of, period)?,
+        None => Vec::new(),
+    };
+    let funding = budget::funding_for_bills(state, range.as_of, &bills)?;
     result.cash = funding.cash;
     result.free = funding.free;
     result.protected_savings = funding.savings;
@@ -193,9 +205,7 @@ pub fn snapshot(
         result.funded_expenses,
         result.reserved,
     ));
-    let horizon = crate::periods::at(state, range.as_of)
-        .map(|period| period.end)
-        .unwrap_or(range.as_of);
+    let horizon = period.as_ref().map_or(range.as_of, |period| period.end);
     let obligations = crate::expenses::obligations(state, horizon.max(range.through))?;
     let (planned, paid) = commitments(
         state,
@@ -210,13 +220,15 @@ pub fn snapshot(
         .push(progress("dashboardEssentialPayments", "", paid, planned));
     let mut essential_funded = 0;
     let mut essential_target = 0;
-    for item in crate::expenses::outstanding(state, range.as_of, horizon)?
-        .iter()
-        .filter(|item| item.essential_id.is_some())
-    {
-        let forecast = crate::forecast::preview(state, range.as_of, &item.id, false, false)?;
-        essential_funded = budget::total(essential_funded, forecast.allocated)?;
-        essential_target = budget::total(essential_target, item.amount.hundredths())?;
+    let mut available = result.funded_expenses;
+    for item in bills {
+        let amount = item.amount.hundredths();
+        let allocated = available.min(amount);
+        available -= allocated;
+        if item.essential_id.is_some() {
+            essential_funded = budget::total(essential_funded, allocated)?;
+            essential_target = budget::total(essential_target, amount)?;
+        }
     }
     result.progress.push(progress(
         "dashboardEssentialFunding",
@@ -331,14 +343,9 @@ fn commitments(
     let matches = |item: &PlannedItem| {
         item.kind == PlannedKind::Expense
             && (!essential_only || item.essential_id.is_some())
-            && if let Some(id) = period_id {
-                match crate::periods::context::planned_period(state, item) {
-                    Some(assigned) => assigned == id,
-                    None => item.date >= range.from && item.date <= range.through,
-                }
-            } else {
-                item.date >= range.from && item.date <= range.through
-            }
+            && item.date >= range.from
+            && item.date <= range.through
+            && period_id.is_none_or(|id| crate::periods::context::planned_matches(state, item, id))
     };
     let planned = obligations
         .iter()

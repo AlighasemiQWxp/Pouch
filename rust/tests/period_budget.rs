@@ -126,8 +126,18 @@ fn today_summary_reserves_only_bills_due_in_the_dates_budget_period() {
     let budget_plan = app
         .budget_summary("2024-10-10".into(), Some(first))
         .unwrap();
-    assert_eq!(budget_plan.reserved, 1800);
-    assert_eq!(budget_plan.shortfall, 800);
+    assert_eq!(budget_plan.reserved, today.reserved);
+    assert_eq!(budget_plan.shortfall, today.shortfall);
+    let view = app.period_view("2024-10-10".into()).unwrap();
+    assert_eq!(view.period.remaining, today.remaining);
+    assert_eq!(view.budget.reserved, today.reserved);
+    assert_eq!(
+        view.obligations
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        ["first-day", "last-day"]
+    );
 
     let next_period = app.budget_summary("2024-11-10".into(), None).unwrap();
     assert_eq!(next_period.reserved, 400);
@@ -758,7 +768,7 @@ fn income_assignment_is_independent_of_date_without_duplicating_cash() {
 }
 
 #[test]
-fn assigned_future_expenses_and_goals_use_the_chosen_period() {
+fn future_bill_assignment_does_not_reduce_period_savings() {
     let mut state = state();
     let first = state.periods[0].id.clone();
     let second = periods::create(
@@ -788,11 +798,20 @@ fn assigned_future_expenses_and_goals_use_the_chosen_period() {
         .unwrap();
         periods::context::assign_planned(&mut state, id, period_id).unwrap();
     }
+    budget::save_plan(
+        &mut state,
+        BudgetPlan {
+            period_id: first,
+            effective: day("2024-10-10"),
+            savings: money(1800),
+        },
+    )
+    .unwrap();
     savings::reconcile(&mut state, day("2024-10-10")).unwrap();
     let funding = budget::funding(&state, day("2024-10-10")).unwrap();
-    assert_eq!(funding.reserved, 500);
-    assert_eq!(funding.savings, 0);
-    assert_eq!(funding.free, 1500);
+    assert_eq!(funding.reserved, 0);
+    assert_eq!(funding.savings, 1800);
+    assert_eq!(funding.free, 200);
     assert_eq!(
         periods::context::planned_period(&state, &state.planned[1]),
         Some(second.as_str())

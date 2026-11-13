@@ -118,7 +118,7 @@ fn forecast_plan(
         .ok_or(PouchError::InvalidEntry)?;
     let length = i64::from(period.start.days_until(period.end)).max(1);
     let plan = plan_at(state, as_of);
-    let essential = crate::savings::essential(state, as_of)?;
+    let summary = crate::budget::recommend(state, as_of)?;
     let income = crate::budget::income_for_period(state, &period.id, as_of)?;
     let linked: std::collections::BTreeSet<(Date, &str)> = obligations
         .iter()
@@ -137,20 +137,16 @@ fn forecast_plan(
     let daily = match daily_allowance {
         Some(amount) => amount.hundredths(),
         None if spent > 0 => ceiling(spent, 1, elapsed)?,
-        None => crate::budget::recommend(state, as_of)?.recommendation,
+        None => summary.recommendation,
     };
     let living = ceiling(daily, length, 1)?;
-    let saved = crate::savings::balance(state, as_of)?;
-    let summary = crate::budget::recommend(state, as_of)?;
-    let funding = crate::budget::funding(state, as_of)?;
-    let expense_pool = (funding.cash - saved).max(0).min(funding.reserved);
-    let mut items: Vec<_> = obligations
-        .iter()
-        .filter(|item| {
-            item.status == PlannedStatus::Pending || item.paid_date.is_some_and(|paid| paid > as_of)
-        })
-        .collect();
-    items.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.id.cmp(&b.id)));
+    let expense_pool = summary.funded_expenses;
+    let items = obligations.iter().filter(|item| {
+        (item.status == PlannedStatus::Pending || item.paid_date.is_some_and(|paid| paid > as_of))
+            && (item.kind == PlannedKind::Goal
+                || item.id == selected_id
+                || crate::budget::bill_due_in_period(state, item, &period))
+    });
     let mut goal_total = 0;
     let mut expense_total = 0;
     let contributed = state
@@ -181,7 +177,7 @@ fn forecast_plan(
                 goal_total = add(goal_total, (item.amount.hundredths() - allocated).max(0))?;
                 (allocated, goal_total, &mut goal_rate)
             }
-            PlannedKind::Expense => {
+            PlannedKind::Expense if crate::budget::bill_due_in_period(state, item, &period) => {
                 let earlier = expense_total;
                 expense_total = add(expense_total, item.amount.hundredths())?;
                 let allocated = (expense_pool - earlier)
@@ -193,6 +189,7 @@ fn forecast_plan(
                     &mut expense_rate,
                 )
             }
+            PlannedKind::Expense => (0, item.amount.hundredths(), &mut expense_rate),
         };
         let days = i64::from(as_of.days_until(item.date)).max(0);
         let needed = if remaining == 0 {
@@ -219,8 +216,8 @@ fn forecast_plan(
     let remaining_days = i64::from(as_of.days_until(period.end)).max(1);
     let required = if simplify {
         let additional = (add(ceiling(daily, remaining_days, 1)?, commitments)?
-            - funding.free.max(0))
-        .max((-funding.free).max(0))
+            - summary.remaining.max(0))
+        .max(summary.shortfall)
         .max(0);
         add(income, additional)?
     } else {
@@ -242,7 +239,7 @@ fn forecast_plan(
         income
     };
     let available = if simplify {
-        (crate::budget::total(funding.free, (projected_income - income).max(0))?
+        (crate::budget::total(summary.remaining, (projected_income - income).max(0))?
             - ceiling(proposed_daily, remaining_days, 1)?)
         .max(0)
     } else {
@@ -254,7 +251,7 @@ fn forecast_plan(
                 available,
                 (projected_income - income)
                     .max(0)
-                    .min((funding.reserved - expense_pool).max(0)),
+                    .min((summary.reserved - expense_pool).max(0)),
             )?
         } else {
             available
@@ -319,7 +316,7 @@ fn forecast_plan(
         .min(summary.recommendation);
     Ok(FinancialForecast {
         controllable_spending: ceiling(proposed_daily, length, 1)?,
-        essential_expenses: essential,
+        essential_expenses: summary.required_expenses,
         configured_savings: plan.savings.hundredths(),
         extra_days: completion_days.map(|days| {
             if selected_remaining == 0 {
@@ -586,6 +583,7 @@ mod tests {
     #[test]
     fn higher_living_costs_delay_completion_and_can_remove_capacity() {
         let mut state = state(PlannedKind::Expense);
+        state.planned[0].date = Date::parse_iso("2024-01-31").expect("valid date");
         state.income.push(IncomeEntry {
             id: "salary".into(),
             date: state.start_date,
@@ -616,6 +614,7 @@ mod tests {
     #[test]
     fn funded_expenses_are_ready_today_and_paid_items_are_not_forecast() {
         let mut state = state(PlannedKind::Expense);
+        state.planned[0].date = Date::parse_iso("2024-01-31").expect("valid date");
         state.income.push(IncomeEntry {
             id: "salary".into(),
             date: state.start_date,

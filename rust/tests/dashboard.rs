@@ -201,6 +201,80 @@ fn pending_expenses_reserve_cash_without_becoming_payments() {
 }
 
 #[test]
+fn budget_period_balances_exclude_bills_due_outside_the_selected_period() {
+    let mut state = records();
+    receive(&mut state, "salary", "2024-01-01", 10_000);
+    for (id, due, amount, assignment) in [
+        ("overdue", "2024-01-31", 20_000, None),
+        ("in-period", "2024-02-29", 3_000, None),
+        ("next-period", "2024-03-01", 20_000, Some("BP-002")),
+        ("assigned-elsewhere", "2024-02-02", 20_000, Some("BP-001")),
+    ] {
+        expenses::save_planned(
+            &mut state,
+            expenses::create_planned(
+                id.into(),
+                id.into(),
+                money(amount),
+                Category::Bills,
+                PlannedKind::Expense,
+                date(due),
+            ),
+        )
+        .unwrap();
+        if let Some(period) = assignment {
+            periods::context::assign_planned(&mut state, id, period).unwrap();
+        }
+    }
+    expenses::save_essential(
+        &mut state,
+        RequiredExpense {
+            id: "rent".into(),
+            name: "Rent".into(),
+            amount: money(2_000),
+            date: date("2024-02-01"),
+            recurrence: Recurrence::Monthly,
+            calendar: Calendar::Gregorian,
+            until: None,
+        },
+    )
+    .unwrap();
+    let selection = DashboardQuery {
+        mode: "period".into(),
+        anchor: date("2024-02-10"),
+        period_id: Some("BP-002".into()),
+        from: None,
+        through: None,
+    };
+    let snapshot = dashboard::snapshot(&state, &selection, date("2024-02-10")).unwrap();
+    assert_eq!(
+        (snapshot.reserved, snapshot.funded_expenses, snapshot.free),
+        (5_000, 5_000, 5_000)
+    );
+    let essential = snapshot
+        .progress
+        .iter()
+        .find(|entry| entry.key == "dashboardEssentialFunding")
+        .unwrap();
+    assert_eq!((essential.amount, essential.target), (2_000, 2_000));
+    assert_eq!(snapshot.comparisons[0].planned, 2_000);
+    let calendar = dashboard::snapshot(
+        &state,
+        &query("2024-02-01", "2024-02-29"),
+        date("2024-02-10"),
+    )
+    .unwrap();
+    assert_eq!((calendar.reserved, calendar.free), (5_000, 5_000));
+
+    buy(&mut state, "purchase", "2024-02-11", 8_000);
+    let snapshot = dashboard::snapshot(&state, &selection, date("2024-02-12")).unwrap();
+    assert_eq!(
+        (snapshot.reserved, snapshot.funded_expenses, snapshot.free),
+        (5_000, 2_000, -3_000)
+    );
+}
+
+#[test]
 fn essential_classification_uses_payment_links_not_category_guesses() {
     let mut state = records();
     receive(&mut state, "salary", "2024-01-01", 10_000);

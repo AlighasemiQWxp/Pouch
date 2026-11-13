@@ -55,7 +55,7 @@ fn reconcile_at(state: &mut AppState, date: Date) -> PouchResult<()> {
         .retain(|item| item.date != date || item.period_id != period.id);
     let raw = raw_balance(state, date)?;
     let current = raw.max(0);
-    let funding = crate::budget::funding(state, date)?;
+    let funding = crate::budget::funding_for_period(state, date, Some(&period))?;
     let available = (funding.cash - funding.reserved).max(0);
     let contributed = state
         .allocations
