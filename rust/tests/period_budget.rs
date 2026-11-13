@@ -62,6 +62,82 @@ fn first_period_is_explicit_and_horizon_does_not_create_more_periods() {
         0
     );
 }
+
+#[test]
+fn today_summary_reserves_only_bills_due_in_the_dates_budget_period() {
+    let mut state = state();
+    let first = state.periods[0].id.clone();
+    let second = periods::create(
+        &mut state,
+        day("2024-11-10"),
+        day("2024-12-10"),
+        Recurrence::Monthly,
+        Calendar::Gregorian,
+    )
+    .unwrap();
+    receive(&mut state, "salary", "2024-10-10", 1000);
+    for (id, due, amount, assigned_period) in [
+        ("first-day", "2024-10-10", 200, Some(first.as_str())),
+        ("last-day", "2024-11-09", 300, None),
+        ("next-period-start", "2024-11-10", 400, None),
+        (
+            "assigned-but-due-later",
+            "2024-12-22",
+            800,
+            Some(first.as_str()),
+        ),
+        (
+            "assigned-to-next-period",
+            "2024-10-10",
+            100,
+            Some(second.as_str()),
+        ),
+    ] {
+        expenses::save_planned(
+            &mut state,
+            expenses::create_planned(
+                id.into(),
+                id.into(),
+                money(amount),
+                Category::Bills,
+                PlannedKind::Expense,
+                day(due),
+            ),
+        )
+        .unwrap();
+        if let Some(period) = assigned_period {
+            periods::context::assign_planned(&mut state, id, period).unwrap();
+        }
+    }
+
+    let folder = tempfile::tempdir().unwrap();
+    let mut app =
+        pouch_core::api::PouchApp::open(folder.path().to_str().unwrap().to_owned(), vec![])
+            .unwrap();
+    app.import_backup(pouch_core::backup::export_json(&state).unwrap())
+        .unwrap();
+
+    let today = app.budget_summary("2024-10-10".into(), None).unwrap();
+    assert_eq!(today.reserved, 500);
+    assert_eq!(today.remaining, 500);
+    assert_eq!(today.shortfall, 0);
+    assert_eq!(today.recommendation, 500 / 31);
+
+    let budget_plan = app
+        .budget_summary("2024-10-10".into(), Some(first))
+        .unwrap();
+    assert_eq!(budget_plan.reserved, 1800);
+    assert_eq!(budget_plan.shortfall, 800);
+
+    let next_period = app.budget_summary("2024-11-10".into(), None).unwrap();
+    assert_eq!(next_period.reserved, 400);
+    assert_eq!(next_period.carry, 500);
+
+    let outside_period = app.budget_summary("2024-12-10".into(), None).unwrap();
+    assert_eq!(outside_period.days_remaining, 0);
+    assert_eq!(outside_period.reserved, 0);
+}
+
 #[test]
 fn income_calendar_creates_inclusive_exclusive_periods_with_stable_ids() {
     let mut state = state();

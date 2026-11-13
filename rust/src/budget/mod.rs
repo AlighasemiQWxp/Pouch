@@ -30,6 +30,12 @@ pub struct Funding {
     pub free: i64,
 }
 
+#[derive(Clone, Copy)]
+enum BillScope {
+    Outstanding,
+    DueInPeriod,
+}
+
 pub fn period_at(state: &AppState, date: Date) -> PouchResult<Period> {
     crate::periods::at(state, date)
 }
@@ -131,10 +137,35 @@ pub fn cash(state: &AppState, date: Date) -> PouchResult<i64> {
 }
 
 pub fn funding(state: &AppState, date: Date) -> PouchResult<Funding> {
-    let horizon = period_at(state, date)
-        .map(|period| period.end)
-        .unwrap_or(date);
-    let pending = crate::expenses::outstanding(state, date, horizon)?;
+    funding_with_scope(
+        state,
+        date,
+        period_at(state, date).ok().as_ref(),
+        BillScope::Outstanding,
+    )
+}
+
+fn funding_with_scope(
+    state: &AppState,
+    date: Date,
+    period: Option<&Period>,
+    scope: BillScope,
+) -> PouchResult<Funding> {
+    let horizon = period.map_or(date, |period| period.end);
+    let pending = match (scope, period) {
+        (BillScope::Outstanding, _) => crate::expenses::outstanding(state, date, horizon)?,
+        (BillScope::DueInPeriod, Some(period)) => {
+            crate::expenses::outstanding(state, date, horizon)?
+                .into_iter()
+                .filter(|item| {
+                    item.date >= period.start
+                        && item.date < period.end
+                        && crate::periods::context::planned_matches(state, item, &period.id)
+                })
+                .collect()
+        }
+        (BillScope::DueInPeriod, None) => Vec::new(),
+    };
     let reserved = pending
         .iter()
         .try_fold(0, |sum, item| total(sum, item.amount.hundredths()))?;
@@ -155,12 +186,27 @@ pub fn funding(state: &AppState, date: Date) -> PouchResult<Funding> {
 }
 
 pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
-    let period = period_at(state, date);
-    let funding = funding(state, date)?;
-    let (end, count, start) = match period {
-        Ok(period) => (period.end, date.days_until(period.end), period.start),
-        Err(PouchError::MissingPeriod) => (date.add_days(1)?, 0, date),
+    recommend_with_scope(state, date, BillScope::Outstanding)
+}
+
+pub(crate) fn recommend_for_day(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
+    recommend_with_scope(state, date, BillScope::DueInPeriod)
+}
+
+fn recommend_with_scope(
+    state: &AppState,
+    date: Date,
+    scope: BillScope,
+) -> PouchResult<BudgetSummary> {
+    let period = match period_at(state, date) {
+        Ok(period) => Some(period),
+        Err(PouchError::MissingPeriod) => None,
         Err(error) => return Err(error),
+    };
+    let funding = funding_with_scope(state, date, period.as_ref(), scope)?;
+    let (end, count, start) = match &period {
+        Some(period) => (period.end, date.days_until(period.end), period.start),
+        None => (date.add_days(1)?, 0, date),
     };
     let spent_today = spent(state, date, date.add_days(1)?)?;
     let linked: std::collections::BTreeSet<&str> = state
@@ -190,7 +236,7 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
         0
     };
     let carry = if start > state.start_date {
-        funding_before(state, start)?.free
+        funding_before_with_scope(state, start, scope)?.free
     } else {
         0
     };
@@ -202,9 +248,9 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
         daily,
         spent: spent_today,
         remaining: funding.free,
-        income: match period_at(state, date) {
-            Ok(period) => income_for_period(state, &period.id, date)?,
-            Err(_) => income_between(state, start, date.add_days(1)?)?,
+        income: match period {
+            Some(period) => income_for_period(state, &period.id, date)?,
+            None => income_between(state, start, date.add_days(1)?)?,
         },
         required_expenses: funding.essential,
         savings: funding.savings,
@@ -217,6 +263,14 @@ pub fn recommend(state: &AppState, date: Date) -> PouchResult<BudgetSummary> {
 }
 
 pub fn funding_before(state: &AppState, date: Date) -> PouchResult<Funding> {
+    funding_before_with_scope(state, date, BillScope::Outstanding)
+}
+
+fn funding_before_with_scope(
+    state: &AppState,
+    date: Date,
+    scope: BillScope,
+) -> PouchResult<Funding> {
     if date <= state.start_date {
         return Ok(Funding {
             cash: 0,
@@ -226,7 +280,8 @@ pub fn funding_before(state: &AppState, date: Date) -> PouchResult<Funding> {
             free: 0,
         });
     }
-    funding(state, date.add_days(-1)?)
+    let prior = date.add_days(-1)?;
+    funding_with_scope(state, prior, period_at(state, prior).ok().as_ref(), scope)
 }
 
 pub(crate) fn total(left: i64, right: i64) -> PouchResult<i64> {

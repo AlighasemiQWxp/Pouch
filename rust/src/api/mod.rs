@@ -106,16 +106,18 @@ impl PouchApp {
         date: String,
         period_id: Option<String>,
     ) -> Result<BudgetSnapshot, String> {
-        let mut date = parse_date(&date)?;
-        if let Some(id) = period_id {
-            let period =
-                crate::periods::find(self.core.state(), &id).map_err(|error| error.to_string())?;
-            date = date
+        let date = parse_date(&date)?;
+        let state = self.core.state();
+        let summary = if let Some(id) = period_id {
+            let period = crate::periods::find(state, &id).map_err(|error| error.to_string())?;
+            let date = date
                 .max(period.start)
                 .min(period.end.add_days(-1).map_err(|error| error.to_string())?);
+            crate::budget::recommend(state, date)
+        } else {
+            crate::budget::recommend_for_day(state, date)
         }
-        let summary =
-            crate::budget::recommend(self.core.state(), date).map_err(|error| error.to_string())?;
+        .map_err(|error| error.to_string())?;
         Ok(BudgetSnapshot {
             date: summary.date.iso().map_err(|error| error.to_string())?,
             period_end: summary
